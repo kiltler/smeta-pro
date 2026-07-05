@@ -2,9 +2,11 @@
 import logging
 import uuid
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, status
 from minio.error import S3Error
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app import storage
@@ -25,10 +27,23 @@ ALLOWED_LOGO_TYPES = {
 
 
 class ProfileIn(BaseModel):
-    brand_name: str | None = None
-    full_name: str | None = None
+    brand_name: str | None = Field(default=None, max_length=200)
+    full_name: str | None = Field(default=None, max_length=200)
     inn: str | None = None
     requisites: dict = {}
+
+    @field_validator("inn")
+    @classmethod
+    def validate_inn(cls, v: str | None) -> str | None:
+        if v is None or v.strip() == "":
+            return None
+        digits = re.sub(r"\D", "", v)
+        if len(digits) not in (10, 12):
+            raise ValueError(
+                "ИНН — это 10 цифр (организация) или 12 цифр (ИП/самозанятый). "
+                f"У вас {len(digits)}."
+            )
+        return digits
 
 
 class ProfileOut(ProfileIn):

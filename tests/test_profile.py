@@ -27,6 +27,23 @@ def test_profile_empty_then_update(auth_client):
     assert auth_client.get("/profile").json() == {**data, "has_logo": False}
 
 
+def test_inn_validation(auth_client):
+    # 14 цифр — не ИНН: понятная ошибка, а не 500
+    resp = auth_client.put("/profile", json={"inn": "25541242142142"})
+    assert resp.status_code == 422
+    assert "ИНН" in resp.json()["detail"][0]["msg"]
+
+    # 12 цифр (ИП) и 10 цифр (организация) проходят, формат с пробелами чистится
+    assert auth_client.put("/profile", json={"inn": "254 124 214 212"}).status_code == 200
+    assert auth_client.get("/profile").json()["inn"] == "254124214212"
+    assert auth_client.put("/profile", json={"inn": "2721234567"}).status_code == 200
+
+    # пустая строка — это «не указан»
+    resp = auth_client.put("/profile", json={"inn": ""})
+    assert resp.status_code == 200
+    assert auth_client.get("/profile").json()["inn"] is None
+
+
 def test_logo_upload_and_download(auth_client):
     storage.ensure_bucket()
 

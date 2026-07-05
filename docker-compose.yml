@@ -3,7 +3,10 @@
 services:
   api:
     build: .
-    env_file: .env
+    env_file:
+      # Файл необязателен: для локальной разработки хватает значений по умолчанию
+      - path: .env
+        required: false
     environment:
       # Внутри docker-сети всегда обращаемся к сервисам по их именам
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-smeta}:${POSTGRES_PASSWORD:-smeta}@db:5432/${POSTGRES_DB:-smeta}

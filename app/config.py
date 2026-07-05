@@ -16,5 +16,12 @@ class Settings(BaseSettings):
     s3_bucket: str = "smeta"
     s3_secure: bool = False
 
+    # Вход по SMS-коду
+    auth_code_ttl_minutes: int = 5
+    auth_rate_limit_per_hour: int = 3
+    jwt_ttl_days: int = 30
+    sms_provider: str = "stub"
+    sms_api_key: str = ""
+
 
 settings = Settings()

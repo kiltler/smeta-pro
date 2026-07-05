@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import storage
-from app.api import health
+from app.api import auth, health
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,3 +24,4 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="СметаПро", lifespan=lifespan)
 app.include_router(health.router)
+app.include_router(auth.router)

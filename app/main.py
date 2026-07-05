@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import storage
-from app.routers import health
+from app.api import health
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

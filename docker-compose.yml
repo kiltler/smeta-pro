@@ -13,7 +13,7 @@ services:
     volumes:
       # Живая перезагрузка кода при разработке
       - ./app:/code/app
-      - ./alembic:/code/alembic
+      - ./migrations:/code/migrations
       - ./alembic.ini:/code/alembic.ini
       - ./scripts:/code/scripts
     depends_on:

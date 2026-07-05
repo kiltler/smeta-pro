@@ -1,0 +1,26 @@
+"""Точка входа приложения «СметаПро»."""
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app import storage
+from app.routers import health
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Готовим бакет в хранилище; если оно ещё не поднялось — не падаем,
+    # /health честно покажет "storage": "fail".
+    try:
+        storage.ensure_bucket()
+    except Exception:
+        logger.exception("Не удалось подготовить бакет при старте")
+    yield
+
+
+app = FastAPI(title="СметаПро", lifespan=lifespan)
+app.include_router(health.router)

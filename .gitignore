@@ -1,0 +1,31 @@
+# Окружение и секреты
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Тесты и инструменты
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# IDE
+.idea/
+.vscode/
+
+# Локальные override-файлы docker compose и артефакты песочницы
+docker-compose.override.yml
+Dockerfile.local
+.ccr-ca.crt
+
+# Данные локальных сервисов
+*.dump
+*.sql.gz

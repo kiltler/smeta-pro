@@ -26,6 +26,10 @@ docker-compose.override.yml
 Dockerfile.local
 .ccr-ca.crt
 
+# Frontend
+node_modules/
+frontend/dist/
+
 # Данные локальных сервисов
 *.dump
 *.sql.gz

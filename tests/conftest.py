@@ -75,3 +75,17 @@ def client(test_engine):
         yield TestClient(app)
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def auth_client(client, db_session):
+    """Клиент с готовым JWT: пользователь создан, заголовок Authorization выставлен."""
+    from app.models import User
+    from app.services.auth import create_access_token
+
+    user = User(phone="+79140000042")
+    db_session.add(user)
+    db_session.commit()
+    client.headers["Authorization"] = f"Bearer {create_access_token(user.id)}"
+    client.user_id = user.id
+    return client

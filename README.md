@@ -23,8 +23,11 @@ curl http://localhost:8000/health
 # → {"status":"ok","db":"ok","storage":"ok"}
 ```
 
+- **Приложение (PWA): http://localhost:5173**
 - API: http://localhost:8000 (Swagger — http://localhost:8000/docs)
 - Веб-консоль MinIO: http://localhost:9001 (логин/пароль — `S3_ACCESS_KEY`/`S3_SECRET_KEY` из `.env`)
+
+При входе в dev-режиме SMS-код печатается в лог: `docker compose logs api | grep SMS`.
 
 ## Частые команды
 

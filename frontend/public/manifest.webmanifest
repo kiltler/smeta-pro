@@ -1,0 +1,13 @@
+{
+  "name": "СметаПро",
+  "short_name": "СметаПро",
+  "description": "Смета голосом за минуту: PDF с вашим брендом, согласование онлайн",
+  "lang": "ru",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f6fa",
+  "theme_color": "#1259c3",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

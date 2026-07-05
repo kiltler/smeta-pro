@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.models import Bundle, PriceItem, User
-from scripts.seed_hvac import BUNDLES, PRICE_ITEMS, seed_hvac
+from app.services.hvac_template import BUNDLES, PRICE_ITEMS, seed_hvac
 from tests.conftest import alembic_config
 
 

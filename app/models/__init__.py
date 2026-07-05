@@ -1,6 +1,19 @@
-"""SQLAlchemy-модели. Заполняются в задаче 1."""
-from sqlalchemy.orm import DeclarativeBase
+"""SQLAlchemy-модели проекта. Все модели импортируются здесь,
+чтобы Alembic видел полную metadata при автогенерации миграций."""
+from app.models.base import Base
+from app.models.billing import Subscription, UsageCounter
+from app.models.document import Document, ParseLog
+from app.models.pricelist import Bundle, PriceItem
+from app.models.user import Profile, User
 
-
-class Base(DeclarativeBase):
-    pass
+__all__ = [
+    "Base",
+    "Bundle",
+    "Document",
+    "ParseLog",
+    "PriceItem",
+    "Profile",
+    "Subscription",
+    "UsageCounter",
+    "User",
+]

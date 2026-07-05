@@ -8,10 +8,11 @@ WORKDIR /code
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY alembic.ini .
+COPY alembic.ini pytest.ini ./
 COPY migrations ./migrations
 COPY app ./app
 COPY scripts ./scripts
+COPY tests ./tests
 
 EXPOSE 8000
 

@@ -48,6 +48,14 @@ docker compose exec api alembic upgrade head
 docker compose exec api alembic downgrade -1
 ```
 
+## Сид прайса «кондиционерщик»
+
+```bash
+# заполняет прайс (13 позиций) и комплекты (5) для пользователя с указанным id;
+# повторный запуск данные не дублирует
+docker compose exec api python scripts/seed_hvac.py <user_id>
+```
+
 ## Тесты
 
 ```bash

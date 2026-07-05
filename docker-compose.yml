@@ -16,6 +16,8 @@ services:
       - ./migrations:/code/migrations
       - ./alembic.ini:/code/alembic.ini
       - ./scripts:/code/scripts
+      - ./tests:/code/tests
+      - ./pytest.ini:/code/pytest.ini
     depends_on:
       db:
         condition: service_healthy

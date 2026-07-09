@@ -26,7 +26,9 @@ export async function api(path, { method = 'GET', body, formData } = {}) {
     let detail = data.detail
     // Ошибки валидации FastAPI приходят массивом — берём человекочитаемый текст
     if (Array.isArray(detail)) detail = detail[0]?.msg?.replace(/^Value error, /, '')
-    throw new Error(typeof detail === 'string' ? detail : `Ошибка ${resp.status}`)
+    const err = new Error(typeof detail === 'string' ? detail : `Ошибка ${resp.status}`)
+    err.status = resp.status // 402 → пейволл и т.п.
+    throw err
   }
   if (resp.status === 204) return null
   return resp.json()

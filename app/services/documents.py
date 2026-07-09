@@ -18,6 +18,7 @@ from weasyprint import HTML
 
 from app import storage
 from app.models import Document, Profile, User
+from app.services import billing
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,9 @@ def rubles_in_words(value) -> str:
     return text
 
 
-def build_payload(positions: list[dict], client_name: str | None) -> dict:
+def build_payload(
+    positions: list[dict], client_name: str | None, watermark: bool = False
+) -> dict:
     """Снапшот позиций и сумм для payload документа."""
     snapshot = []
     total = Decimal("0")
@@ -116,7 +119,16 @@ def build_payload(positions: list[dict], client_name: str | None) -> dict:
                 "amount": str(amount),
             }
         )
-    return {"client_name": client_name, "positions": snapshot, "total": str(total)}
+    return {
+        "client_name": client_name,
+        "positions": snapshot,
+        "total": str(total),
+        # знак Free фиксируется в снапшоте: тариф на момент создания документа
+        "watermark": watermark,
+    }
+
+
+WATERMARK_TEXT = "Создано в СметаПро — smeta-pro.ru"
 
 
 def _template_context(document: Document, profile: Profile | None) -> dict:
@@ -152,6 +164,8 @@ def _template_context(document: Document, profile: Profile | None) -> dict:
         "client_name": document.payload.get("client_name"),
         "positions": document.payload["positions"],
         "total": document.payload["total"],
+        "watermark": document.payload.get("watermark", False),
+        "watermark_text": WATERMARK_TEXT,
     }
 
 
@@ -170,11 +184,12 @@ def create_estimate(
 ) -> Document:
     """Создаёт смету: снапшот, неугадываемая ссылка, PDF в хранилище."""
     now = datetime.now(timezone.utc)
+    watermark = not billing.user_is_pro(session, user)
     document = Document(
         user_id=user.id,
         type="estimate",
         status="draft",
-        payload=build_payload(positions, client_name),
+        payload=build_payload(positions, client_name, watermark),
         public_uuid=uuid.uuid4(),
         expires_at=now + timedelta(days=ESTIMATE_TTL_DAYS),
         created_at=now,
@@ -216,6 +231,8 @@ def _contract_context(
         "positions": payload["positions"],
         "total": payload["total"],
         "total_words": rubles_in_words(payload["total"]),
+        "watermark": payload.get("watermark", False),
+        "watermark_text": WATERMARK_TEXT,
     }
 
 
@@ -247,6 +264,7 @@ def create_contract_and_act(
         "estimate_number": estimate.id,
         "estimate_date": estimate.created_at.strftime("%d.%m.%Y"),
         "work_deadline": work_deadline,
+        "watermark": not billing.user_is_pro(session, user),
     }
     contract = Document(
         user_id=user.id, type="contract", status="draft",

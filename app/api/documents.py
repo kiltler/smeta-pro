@@ -13,7 +13,12 @@ from app import storage
 from app.api.deps import get_current_user
 from app.db import get_db
 from app.models import Document, User
+from app.services import billing
 from app.services import documents as doc_service
+
+PAYWALL_DETAIL = (
+    "Создано 3 документа в этом месяце. Pro снимает лимит — 790 ₽/мес"
+)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -101,13 +106,25 @@ def _get_own(db: Session, user: User, doc_id: int) -> Document:
     return document
 
 
+def _check_limit_or_402(db: Session, user: User) -> None:
+    try:
+        billing.ensure_can_create_document(db, user)
+    except billing.LimitExceeded:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=PAYWALL_DETAIL
+        )
+
+
 @router.post("/estimate", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
 def create_estimate(
     data: EstimateIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
+    _check_limit_or_402(db, user)
     document = doc_service.create_estimate(
         db, user, [p.model_dump() for p in data.positions], data.client_name
     )
+    billing.increment_usage(db, user)
+    db.commit()
     return _to_out(document)
 
 
@@ -179,4 +196,8 @@ def duplicate(doc_id: int, user: User = Depends(get_current_user), db: Session =
     source = _get_own(db, user, doc_id)
     if source.type != "estimate":
         raise HTTPException(status_code=400, detail="Дублировать можно только смету")
-    return _to_out(doc_service.duplicate_estimate(db, user, source))
+    _check_limit_or_402(db, user)
+    document = doc_service.duplicate_estimate(db, user, source)
+    billing.increment_usage(db, user)
+    db.commit()
+    return _to_out(document)

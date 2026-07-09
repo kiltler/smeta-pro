@@ -112,6 +112,16 @@ function confirmAskDialog() {
 const checkout = ref(false)
 const clientName = ref('')
 const creating = ref(false)
+const paywall = ref(false) // лимит Free исчерпан
+
+async function goPro() {
+  try {
+    const { confirmation_url } = await api('/billing/subscribe', { method: 'POST' })
+    location.href = confirmation_url
+  } catch (e) {
+    error.value = e.message
+  }
+}
 
 async function createEstimate() {
   error.value = ''
@@ -135,7 +145,12 @@ async function createEstimate() {
     checkout.value = false
     router.push({ path: '/docs', query: { created: doc.id } })
   } catch (e) {
-    error.value = e.message
+    if (e.status === 402) {
+      checkout.value = false
+      paywall.value = true // корзина сохранена — оформит после апгрейда
+    } else {
+      error.value = e.message
+    }
   } finally {
     creating.value = false
   }
@@ -256,6 +271,20 @@ async function confirmReview() {
       <button @click="confirmAskDialog">Добавить</button>
       <button class="secondary" @click="askDialog = null">Отмена</button>
     </div>
+  </div>
+
+  <!-- Пейволл: спокойный, без таймеров -->
+  <div v-else-if="paywall" class="card">
+    <h2>Создано 3 документа в этом месяце</h2>
+    <p class="muted" style="margin: 8px 0 16px">
+      На тарифе Free — 3 документа в месяц. Pro снимает лимит и убирает
+      водяной знак с PDF — 790 ₽/мес, отмена в любой момент.
+      Смета сохранена и никуда не денется.
+    </p>
+    <button @click="goPro">Подключить Pro — 790 ₽/мес</button>
+    <button class="secondary" style="margin-top: 10px" @click="paywall = false">
+      Вернуться к смете
+    </button>
   </div>
 
   <!-- Оформление: имя клиента → PDF -->

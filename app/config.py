@@ -23,6 +23,15 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-5"
 
+    # Биллинг (ЮKassa; тестовый магазин = тестовые shop_id/secret)
+    yookassa_shop_id: str = ""
+    yookassa_secret_key: str = ""
+    pro_price_rub: int = 790
+    free_doc_limit: int = 3
+    billing_grace_days: int = 3
+    # Куда ЮKassa вернёт пользователя после оплаты
+    billing_return_url: str = "http://localhost:5173/#/profile"
+
     # Вход по SMS-коду
     auth_code_ttl_minutes: int = 5
     auth_rate_limit_per_hour: int = 3

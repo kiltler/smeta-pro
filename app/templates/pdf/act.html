@@ -19,6 +19,8 @@
   .req h3 { font-size: 10pt; margin: 0 0 6px; }
   .sig-line { border-bottom: 1px solid #333; height: 30px; margin: 18px 0 4px; }
   .hint { font-size: 8pt; color: #777; }
+  .wm { position: fixed; bottom: -12mm; left: 0; right: 0; text-align: center;
+        font-size: 8.5pt; color: #98a4b3; }
 </style>
 </head>
 <body>
@@ -80,5 +82,6 @@
       <div class="hint">подпись</div>
     </div>
   </div>
+  {% if watermark %}<div class="wm">{{ watermark_text }}</div>{% endif %}
 </body>
 </html>

@@ -5,7 +5,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import storage
-from app.api import auth, bundles, documents, health, parse, pricelist, profile, public
+from app.api import (
+    auth,
+    billing,
+    bundles,
+    documents,
+    health,
+    parse,
+    pricelist,
+    profile,
+    public,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,3 +41,4 @@ app.include_router(bundles.router)
 app.include_router(parse.router)
 app.include_router(documents.router)
 app.include_router(public.router)
+app.include_router(billing.router)

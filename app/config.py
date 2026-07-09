@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     s3_bucket: str = "smeta"
     s3_secure: bool = False
 
+    # ИИ-парсер (Anthropic API)
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-5"
+
     # Вход по SMS-коду
     auth_code_ttl_minutes: int = 5
     auth_rate_limit_per_hour: int = 3

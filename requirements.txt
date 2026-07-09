@@ -4,6 +4,7 @@ sqlalchemy==2.0.41
 psycopg[binary]==3.2.9
 alembic==1.16.4
 minio==7.2.15
+anthropic==0.116.0
 pydantic-settings==2.10.1
 pyjwt==2.10.1
 python-multipart==0.0.20

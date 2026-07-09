@@ -9,6 +9,7 @@ const showTabs = computed(() => !['/login', '/onboarding'].includes(route.path))
 <template>
   <router-view />
   <nav v-if="showTabs" class="tabs">
+    <router-link to="/new">Смета</router-link>
     <router-link to="/price">Прайс</router-link>
     <router-link to="/bundles">Комплекты</router-link>
     <router-link to="/profile">Профиль</router-link>

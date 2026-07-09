@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body { font-family: "DejaVu Sans", sans-serif; font-size: 11pt; color: #17212b; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start;
+            border-bottom: 2px solid #1259c3; padding-bottom: 12px; }
+  .brand { font-size: 20pt; font-weight: bold; color: #1259c3; }
+  .contractor { font-size: 9pt; color: #555; margin-top: 4px; white-space: pre-line; }
+  .logo { max-height: 60px; max-width: 160px; }
+  h1 { font-size: 15pt; margin: 18px 0 2px; }
+  .meta { font-size: 9.5pt; color: #555; margin-bottom: 14px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { background: #eef3fb; text-align: left; font-size: 9.5pt; color: #333; }
+  th, td { border: 1px solid #d4dce6; padding: 6px 8px; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .total-row td { font-weight: bold; font-size: 12pt; border-top: 2px solid #1259c3; }
+  .validity { margin-top: 14px; font-size: 9.5pt; color: #555; }
+  .signatures { margin-top: 36px; display: flex; justify-content: space-between; font-size: 10pt; }
+  .sig { width: 46%; }
+  .sig .line { border-bottom: 1px solid #333; height: 34px; margin-bottom: 4px; }
+  .sig .hint { font-size: 8pt; color: #777; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="brand">{{ brand_name }}</div>
+      <div class="contractor">{{ contractor_lines }}</div>
+    </div>
+    {% if logo_data_uri %}<img class="logo" src="{{ logo_data_uri }}" alt="">{% endif %}
+  </div>
+
+  <h1>Смета № {{ number }} от {{ created_date }}</h1>
+  <div class="meta">
+    {% if client_name %}Заказчик: {{ client_name }}<br>{% endif %}
+    Смета действительна до {{ valid_until }} (14 дней)
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 24px">№</th>
+        <th>Наименование работ</th>
+        <th class="num">Кол-во</th>
+        <th class="num">Цена, ₽</th>
+        <th class="num">Сумма, ₽</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in positions %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ p.name }}</td>
+        <td class="num">{{ p.qty }} {{ p.unit }}</td>
+        <td class="num">{{ p.price | money }}</td>
+        <td class="num">{{ p.amount | money }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="total-row">
+        <td colspan="4">Итого</td>
+        <td class="num">{{ total | money }} ₽</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="validity">
+    Цены зафиксированы на срок действия сметы. Гарантия на выполненные работы —
+    по договору.
+  </div>
+
+  <div class="signatures">
+    <div class="sig">
+      <div class="line"></div>
+      <div class="hint">Исполнитель: {{ full_name or brand_name }}</div>
+    </div>
+    <div class="sig">
+      <div class="line"></div>
+      <div class="hint">Заказчик{% if client_name %}: {{ client_name }}{% endif %}</div>
+    </div>
+  </div>
+</body>
+</html>

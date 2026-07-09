@@ -14,6 +14,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      // Публичные страницы смет для клиентов (в проде этот маршрут возьмёт nginx)
+      '/e': {
+        target: process.env.VITE_API_PROXY || 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
 })

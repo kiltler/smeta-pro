@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.config import settings
 from app.db import get_db
 from app.models import User
 from app.services import parser
@@ -26,6 +27,11 @@ class CorrectionIn(BaseModel):
 
 @router.post("")
 def parse(data: ParseIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not settings.parse_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Распознавание текста временно отключено. Соберите смету из шаблонов.",
+        )
     try:
         return parser.parse_text(db, user, data.text)
     except parser.ParserNotConfigured:

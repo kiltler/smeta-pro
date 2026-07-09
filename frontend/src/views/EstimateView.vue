@@ -1,18 +1,26 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { api } from '../api.js'
 
 // ---------- данные ----------
+const router = useRouter()
 const priceItems = ref([])
 const bundles = ref([])
 const error = ref('')
 const tab = ref('templates') // templates | voice | text
+const parseEnabled = ref(false) // фиче-флаг PARSE_ENABLED с сервера
 
 const itemById = computed(() => Object.fromEntries(priceItems.value.map((i) => [i.id, i])))
 const fmt = (n) => Number(n).toLocaleString('ru-RU')
 
 onMounted(async () => {
   ;[priceItems.value, bundles.value] = await Promise.all([api('/pricelist'), api('/bundles')])
+  try {
+    parseEnabled.value = (await api('/config')).parse_enabled
+  } catch {
+    parseEnabled.value = false
+  }
 })
 
 // ---------- корзина сметы (живёт в localStorage до создания документа) ----------
@@ -98,6 +106,39 @@ function confirmAskDialog() {
     askDialog.value.parts.map(({ part, qty }) => [part.price_item_id, Number(qty) || 0])
   )
   applyBundle(askDialog.value.bundle, asked)
+}
+
+// ---------- оформление сметы (корзина → PDF-документ) ----------
+const checkout = ref(false)
+const clientName = ref('')
+const creating = ref(false)
+
+async function createEstimate() {
+  error.value = ''
+  creating.value = true
+  try {
+    const doc = await api('/documents/estimate', {
+      method: 'POST',
+      body: {
+        positions: cart.value.map((p) => ({
+          name: p.name,
+          unit: p.unit,
+          price: String(p.price),
+          qty: p.qty,
+        })),
+        client_name: clientName.value.trim() || null,
+      },
+    })
+    cart.value = []
+    saveCart()
+    clientName.value = ''
+    checkout.value = false
+    router.push({ path: '/docs', query: { created: doc.id } })
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    creating.value = false
+  }
 }
 
 // ---------- голос (Web Speech API, ru-RU) + текст ----------
@@ -217,16 +258,30 @@ async function confirmReview() {
     </div>
   </div>
 
+  <!-- Оформление: имя клиента → PDF -->
+  <div v-else-if="checkout" class="card">
+    <h2>Оформить смету</h2>
+    <label>Заказчик / объект (попадёт в смету, можно пропустить)</label>
+    <input v-model="clientName" placeholder="Сергей, ул. Ленина 5" />
+    <p class="total" style="margin: 14px 0">Итого: {{ fmt(cartTotal) }} ₽</p>
+    <div class="row">
+      <button :disabled="creating" @click="createEstimate">
+        {{ creating ? 'Создаю PDF…' : 'Создать смету' }}
+      </button>
+      <button class="secondary" @click="checkout = false">Назад</button>
+    </div>
+  </div>
+
   <template v-else>
-    <!-- Табы режимов ввода -->
-    <div class="mode-tabs">
+    <!-- Табы режимов ввода (Голос/Текст — за фиче-флагом PARSE_ENABLED) -->
+    <div v-if="parseEnabled" class="mode-tabs">
       <button :class="{ active: tab === 'templates' }" @click="tab = 'templates'">Шаблоны</button>
       <button :class="{ active: tab === 'voice' }" @click="tab = 'voice'">Голос</button>
       <button :class="{ active: tab === 'text' }" @click="tab = 'text'">Текст</button>
     </div>
 
     <!-- ШАБЛОНЫ -->
-    <template v-if="tab === 'templates'">
+    <template v-if="tab === 'templates' || !parseEnabled">
       <div class="bundle-grid">
         <button
           v-for="bundle in sortedBundles" :key="bundle.id"
@@ -303,9 +358,9 @@ async function confirmReview() {
         <span class="total grow">Итого: {{ fmt(cartTotal) }} ₽</span>
         <button class="small secondary" @click="clearCart">Очистить</button>
       </div>
-      <p v-if="cart.length" class="muted" style="margin-top: 8px">
-        PDF-смета и отправка клиенту появятся в следующем обновлении.
-      </p>
+      <button v-if="cart.length" style="margin-top: 12px" @click="checkout = true">
+        Оформить смету →
+      </button>
     </div>
   </template>
 </template>

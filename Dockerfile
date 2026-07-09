@@ -3,6 +3,11 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+# Системные зависимости WeasyPrint (PDF) + шрифты с кириллицей
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /code
 
 COPY requirements.txt .

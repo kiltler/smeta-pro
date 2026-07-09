@@ -15,8 +15,30 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.fixture(scope="module", autouse=True)
+def require_credits():
+    """Скип всего модуля, если на аккаунте Anthropic нет кредитов."""
+    import anthropic
+
+    from app.config import settings
+
+    try:
+        anthropic.Anthropic(api_key=settings.anthropic_api_key).messages.create(
+            model=settings.anthropic_model,
+            max_tokens=1,
+            messages=[{"role": "user", "content": "ping"}],
+        )
+    except anthropic.BadRequestError as e:
+        if "credit balance" in str(e).lower():
+            pytest.skip("на аккаунте Anthropic нет кредитов — пополните Plans & Billing")
+        raise
+
+
 @pytest.fixture
-def seeded_client(auth_client):
+def seeded_client(auth_client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "parse_enabled", True)
     auth_client.post("/pricelist/seed")
     return auth_client
 

@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     s3_secure: bool = False
 
     # ИИ-парсер (Anthropic API)
+    # Флаг выключен по умолчанию: без кредитов на аккаунте Anthropic
+    # режимы «Голос»/«Текст» скрыты, работает режим «Шаблоны»
+    parse_enabled: bool = False
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-5"
 

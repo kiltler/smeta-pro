@@ -1,14 +1,21 @@
-"""GET /health — проверка живости сервиса и его зависимостей (БД, хранилище)."""
+"""GET /health — проверка живости сервиса; GET /config — публичные фиче-флаги."""
 import logging
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
+from app.config import settings
 from app.db import check_db
 from app.storage import check_storage
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.get("/config")
+def public_config():
+    """Публичные фиче-флаги для фронтенда (без секретов!)."""
+    return {"parse_enabled": settings.parse_enabled}
 
 
 @router.get("/health")

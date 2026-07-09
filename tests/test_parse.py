@@ -12,9 +12,28 @@ from app.services.hvac_template import PRICE_ITEMS
 
 
 @pytest.fixture
-def seeded_client(auth_client):
+def seeded_client(auth_client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "parse_enabled", True)
     auth_client.post("/pricelist/seed")
     return auth_client
+
+
+def test_parse_disabled_by_flag(auth_client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "parse_enabled", False)
+    resp = auth_client.post("/parse", json={"text": "монтаж девятки"})
+    assert resp.status_code == 503
+    assert "из шаблонов" in resp.json()["detail"]
+
+
+def test_config_exposes_flag(client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "parse_enabled", False)
+    assert client.get("/config").json() == {"parse_enabled": False}
 
 
 @pytest.fixture
@@ -112,8 +131,10 @@ def test_duplicate_items_are_merged(seeded_client, mock_model):
     assert result["positions"][0]["qty"] == 5
 
 
-def test_parse_without_key_returns_503(seeded_client):
-    # _call_model не замокан, ключа в тестовом окружении нет
+def test_parse_without_key_returns_503(seeded_client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "anthropic_api_key", "")  # ключ не задан
     resp = seeded_client.post("/parse", json={"text": "монтаж девятки"})
     assert resp.status_code == 503
 

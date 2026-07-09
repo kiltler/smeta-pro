@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body { font-family: "DejaVu Sans", sans-serif; font-size: 10pt; color: #17212b;
+         line-height: 1.45; }
+  h1 { font-size: 13pt; text-align: center; margin: 0 0 2px; }
+  .date { text-align: right; font-size: 9.5pt; color: #555; margin-bottom: 12px; }
+  p { margin: 5px 0; text-align: justify; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 9.5pt; }
+  th { background: #eef3fb; text-align: left; }
+  th, td { border: 1px solid #d4dce6; padding: 5px 7px; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .total-row td { font-weight: bold; }
+  .req { display: flex; gap: 4%; margin-top: 26px; }
+  .req > div { width: 48%; font-size: 9pt; }
+  .req h3 { font-size: 10pt; margin: 0 0 6px; }
+  .sig-line { border-bottom: 1px solid #333; height: 30px; margin: 18px 0 4px; }
+  .hint { font-size: 8pt; color: #777; }
+</style>
+</head>
+<body>
+  <h1>АКТ ВЫПОЛНЕННЫХ РАБОТ № {{ act_number }}</h1>
+  <p style="text-align: center" class="date">
+    к Договору подряда № {{ contract_number }} от {{ contract_date }}
+  </p>
+  <div class="date">{{ act_date }}</div>
+
+  <p>
+    <b>{{ contractor.full_name or contractor.brand_name }}</b> («Исполнитель»)
+    и <b>{{ client.name }}</b>{% if client.inn %}, ИНН {{ client.inn }}{% endif %}
+    («Заказчик») составили настоящий Акт о том, что Исполнитель выполнил,
+    а Заказчик принял следующие работы по адресу: {{ client.address }}.
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 24px">№</th><th>Наименование работ</th>
+        <th class="num">Кол-во</th><th class="num">Цена, ₽</th><th class="num">Сумма, ₽</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in positions %}
+      <tr>
+        <td>{{ loop.index }}</td><td>{{ p.name }}</td>
+        <td class="num">{{ p.qty }} {{ p.unit }}</td>
+        <td class="num">{{ p.price | money }}</td>
+        <td class="num">{{ p.amount | money }}</td>
+      </tr>
+      {% endfor %}
+      <tr class="total-row"><td colspan="4">Итого</td><td class="num">{{ total | money }} ₽</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    Всего выполнено работ на сумму <b>{{ total | money }} рублей</b>, НДС не облагается
+    (Исполнитель применяет специальный налоговый режим «Налог на профессиональный доход»).
+  </p>
+  <p>
+    Работы выполнены в полном объёме, в установленные сроки и с надлежащим
+    качеством. Заказчик претензий по объёму, качеству и срокам выполнения
+    работ не имеет.
+  </p>
+
+  <div class="req">
+    <div>
+      <h3>Исполнитель</h3>
+      {{ contractor.full_name or contractor.brand_name }}
+      {% if contractor.inn %}<br>ИНН {{ contractor.inn }}{% endif %}
+      <div class="sig-line"></div>
+      <div class="hint">подпись</div>
+    </div>
+    <div>
+      <h3>Заказчик</h3>
+      {{ client.name }}
+      <div class="sig-line"></div>
+      <div class="hint">подпись</div>
+    </div>
+  </div>
+</body>
+</html>

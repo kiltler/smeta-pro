@@ -22,7 +22,11 @@ class Document(Base):
     __tablename__ = "documents"
     __table_args__ = (
         CheckConstraint("type IN ('estimate', 'contract', 'act')", name="type_valid"),
-        CheckConstraint("status IN ('draft', 'sent', 'approved')", name="status_valid"),
+        # 'paid' добавлен решением владельца (задача 6): отметка оплаты
+        # включает напоминание про чек в «Мой налог»
+        CheckConstraint(
+            "status IN ('draft', 'sent', 'approved', 'paid')", name="status_valid"
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)

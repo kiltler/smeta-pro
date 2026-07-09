@@ -45,6 +45,59 @@ def _num(value: float) -> float | int:
     return int(value) if float(value).is_integer() else float(value)
 
 
+_UNITS = ["", "один", "два", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"]
+_UNITS_F = ["", "одна", "две", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять"]
+_TEENS = ["десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать",
+          "пятнадцать", "шестнадцать", "семнадцать", "восемнадцать", "девятнадцать"]
+_TENS = ["", "", "двадцать", "тридцать", "сорок", "пятьдесят", "шестьдесят",
+         "семьдесят", "восемьдесят", "девяносто"]
+_HUNDREDS = ["", "сто", "двести", "триста", "четыреста", "пятьсот", "шестьсот",
+             "семьсот", "восемьсот", "девятьсот"]
+
+
+def _triple_words(n: int, feminine: bool) -> str:
+    units = _UNITS_F if feminine else _UNITS
+    words = [_HUNDREDS[n // 100]]
+    rest = n % 100
+    if 10 <= rest <= 19:
+        words.append(_TEENS[rest - 10])
+    else:
+        words.append(_TENS[rest // 10])
+        words.append(units[rest % 10])
+    return " ".join(w for w in words if w)
+
+
+def _plural(n: int, forms: tuple[str, str, str]) -> str:
+    if 11 <= n % 100 <= 14:
+        return forms[2]
+    return {1: forms[0], 2: forms[1], 3: forms[1], 4: forms[1]}.get(n % 10, forms[2])
+
+
+def rubles_in_words(value) -> str:
+    """17700.50 → «семнадцать тысяч семьсот рублей 50 копеек» (до миллиардов)."""
+    d = Decimal(str(value)).quantize(Decimal("0.01"))
+    rubles, kopecks = int(d), int((d - int(d)) * 100)
+    if rubles == 0:
+        text = "ноль"
+    else:
+        parts = []
+        for divisor, feminine, forms in [
+            (10**9, False, ("миллиард", "миллиарда", "миллиардов")),
+            (10**6, False, ("миллион", "миллиона", "миллионов")),
+            (10**3, True, ("тысяча", "тысячи", "тысяч")),
+        ]:
+            group = rubles // divisor % 1000
+            if group:
+                parts.append(f"{_triple_words(group, feminine)} {_plural(group, forms)}")
+        if rubles % 1000:
+            parts.append(_triple_words(rubles % 1000, False))
+        text = " ".join(parts)
+    text += f" {_plural(rubles, ('рубль', 'рубля', 'рублей'))}"
+    if kopecks:
+        text += f" {kopecks:02d} {_plural(kopecks, ('копейка', 'копейки', 'копеек'))}"
+    return text
+
+
 def build_payload(positions: list[dict], client_name: str | None) -> dict:
     """Снапшот позиций и сумм для payload документа."""
     snapshot = []
@@ -138,6 +191,86 @@ def create_estimate(
     session.commit()
     logger.info("Смета №%d создана: позиций %d", document.id, len(positions))
     return document
+
+
+def _contract_context(
+    contract: Document, act: Document, profile: Profile | None, user: User
+) -> dict:
+    payload = contract.payload
+    return {
+        "contract_number": contract.id,
+        "contract_date": contract.created_at.strftime("%d.%m.%Y"),
+        "act_number": act.id,
+        "act_date": act.created_at.strftime("%d.%m.%Y"),
+        "estimate_number": payload["estimate_number"],
+        "estimate_date": payload["estimate_date"],
+        "work_deadline": payload["work_deadline"],
+        "client": payload["client"],
+        "contractor": {
+            "brand_name": (profile.brand_name if profile else None) or "Исполнитель",
+            "full_name": profile.full_name if profile else None,
+            "inn": profile.inn if profile else None,
+            "requisites": (profile.requisites or {}).get("text", "") if profile else "",
+            "phone": user.phone,
+        },
+        "positions": payload["positions"],
+        "total": payload["total"],
+        "total_words": rubles_in_words(payload["total"]),
+    }
+
+
+def render_contract_html(
+    contract: Document, act: Document, profile: Profile | None, user: User
+) -> str:
+    return _env.get_template("pdf/contract.html").render(
+        _contract_context(contract, act, profile, user)
+    )
+
+
+def render_act_html(
+    contract: Document, act: Document, profile: Profile | None, user: User
+) -> str:
+    return _env.get_template("pdf/act.html").render(
+        _contract_context(contract, act, profile, user)
+    )
+
+
+def create_contract_and_act(
+    session: Session, user: User, estimate: Document, client: dict, work_deadline: str
+) -> tuple[Document, Document]:
+    """Договор и акт из согласованной сметы: parent_id → смета, payload — снапшот."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        "client": client,
+        "positions": estimate.payload["positions"],  # снапшот сметы, не прайса
+        "total": estimate.payload["total"],
+        "estimate_number": estimate.id,
+        "estimate_date": estimate.created_at.strftime("%d.%m.%Y"),
+        "work_deadline": work_deadline,
+    }
+    contract = Document(
+        user_id=user.id, type="contract", status="draft",
+        payload=payload, parent_id=estimate.id, created_at=now,
+    )
+    act = Document(
+        user_id=user.id, type="act", status="draft",
+        payload=payload, parent_id=estimate.id, created_at=now,
+    )
+    session.add_all([contract, act])
+    session.flush()  # нужны id для номеров документов
+
+    profile = session.get(Profile, user.id)
+    for document, html in [
+        (contract, render_contract_html(contract, act, profile, user)),
+        (act, render_act_html(contract, act, profile, user)),
+    ]:
+        pdf_key = f"documents/{user.id}/{document.type}-{document.id}.pdf"
+        storage.put_object(pdf_key, HTML(string=html).write_pdf(), "application/pdf")
+        document.pdf_key = pdf_key
+
+    session.commit()
+    logger.info("Договор №%d и акт №%d к смете №%d", contract.id, act.id, estimate.id)
+    return contract, act
 
 
 def duplicate_estimate(session: Session, user: User, source: Document) -> Document:

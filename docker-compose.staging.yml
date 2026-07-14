@@ -1,0 +1,54 @@
+# Staging-стек. Изолирован от prod: своё имя проекта, свои тома, свой env-файл,
+# свой порт (127.0.0.1:8101 — наружу только через nginx с basic auth).
+# Запуск: IMAGE=smeta-pro:<тег> docker compose -f docker-compose.staging.yml up -d
+name: smeta-staging
+
+services:
+  api:
+    image: ${IMAGE:-smeta-pro:staging}
+    env_file: .env.staging
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-smeta}:${POSTGRES_PASSWORD:?задайте в .env.staging}@db:5432/${POSTGRES_DB:-smeta}
+      S3_ENDPOINT: minio:9000
+    ports:
+      - "127.0.0.1:8101:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-smeta}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте в .env.staging}
+      POSTGRES_DB: ${POSTGRES_DB:-smeta}
+    volumes:
+      - staging_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smeta} -d ${POSTGRES_DB:-smeta}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?задайте в .env.staging}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?задайте в .env.staging}
+    command: server /data
+    volumes:
+      - staging_minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  staging_pgdata:
+  staging_minio:

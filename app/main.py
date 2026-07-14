@@ -1,8 +1,10 @@
 """Точка входа приложения «СметаПро»."""
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app import storage
 from app.api import (
@@ -42,3 +44,9 @@ app.include_router(parse.router)
 app.include_router(documents.router)
 app.include_router(public.router)
 app.include_router(billing.router)
+
+# В staging/prod-образе фронт собран в /code/static и раздаётся приложением
+# (один образ = вся версия). Маунт последним — API-маршруты в приоритете.
+_static_dir = Path(__file__).resolve().parent.parent / "static"
+if _static_dir.is_dir():
+    app.mount("/", StaticFiles(directory=_static_dir, html=True), name="spa")

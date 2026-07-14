@@ -33,3 +33,8 @@ frontend/dist/
 # Данные локальных сервисов
 *.dump
 *.sql.gz
+
+# Артефакты деплоя (живут на сервере)
+.staging-image
+.prod-image-history
+deploy/Dockerfile.release.local

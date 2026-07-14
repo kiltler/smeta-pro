@@ -1,0 +1,81 @@
+# Шаблон nginx для prod (app.<домен>) и staging (staging.<домен>).
+# Финальные конфиги генерирует deploy/server-setup.sh через envsubst
+# (переменные APP_DOMAIN, STAGING_DOMAIN) в /etc/nginx/sites-available/smeta.conf.
+# Сертификаты выпускает certbot --nginx после первого запуска.
+
+# ---------- PROD: app.<домен> → 127.0.0.1:8201 ----------
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${APP_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+
+    client_max_body_size 5m;   # логотипы до 2 МБ + запас
+
+    # Фронтенд зовёт /api/<путь> — префикс срезается, бэкенд видит /<путь>
+    location /api/ {
+        proxy_pass http://127.0.0.1:8201/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+    }
+
+    # Всё остальное (PWA-статика, публичные /e/..., вебхук) — как есть
+    location / {
+        proxy_pass http://127.0.0.1:8201;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+    }
+}
+
+# ---------- STAGING: staging.<домен> → 127.0.0.1:8101, закрыт basic auth ----------
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${STAGING_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${STAGING_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${STAGING_DOMAIN}/privkey.pem;
+
+    client_max_body_size 5m;
+
+    # Страницы и статика — за basic auth (staging скрыт от посторонних)
+    auth_basic           "smeta-pro staging";
+    auth_basic_user_file /etc/nginx/.htpasswd_smeta;
+
+    # Вебхук ЮKassa должен проходить БЕЗ basic auth, иначе платежи не подтвердятся
+    location /billing/webhook {
+        auth_basic off;
+        proxy_pass http://127.0.0.1:8101/billing/webhook;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+    }
+
+    # /api БЕЗ basic auth: JWT приложения использует тот же заголовок
+    # Authorization и конфликтует с basic; сами данные защищены JWT
+    location /api/ {
+        auth_basic off;
+        proxy_pass http://127.0.0.1:8101/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8101;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $remote_addr;
+    }
+}
+
+# HTTP → HTTPS (certbot --nginx добавит свои редиректы, этот блок — на всякий случай)
+server {
+    listen 80;
+    server_name ${APP_DOMAIN} ${STAGING_DOMAIN};
+    return 301 https://$host$request_uri;
+}

@@ -301,5 +301,15 @@ def duplicate_estimate(session: Session, user: User, source: Document) -> Docume
     )
 
 
+def set_client_name(session: Session, document: Document, client_name: str) -> None:
+    """Дописывает имя заказчика в смету. Позиции и суммы (снапшот) не трогаем,
+    PDF перегенерируется на том же ключе — публичная ссылка не меняется."""
+    document.payload = {**document.payload, "client_name": client_name}
+    profile = session.get(Profile, document.user_id)
+    pdf_bytes = HTML(string=render_estimate_html(document, profile)).write_pdf()
+    storage.put_object(document.pdf_key, pdf_bytes, "application/pdf")
+    session.commit()
+
+
 def is_expired(document: Document) -> bool:
     return document.expires_at is not None and document.expires_at < datetime.now(timezone.utc)

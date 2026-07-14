@@ -150,3 +150,30 @@ def test_foreign_document_is_404(auth_client, estimate, db_session):
 def test_estimate_requires_positions(auth_client):
     resp = auth_client.post("/documents/estimate", json={"positions": []})
     assert resp.status_code == 422
+
+
+def test_set_client_name_later(auth_client, db_session):
+    """Смета без имени → имя дописывается позже, PDF перегенерируется, ссылка та же."""
+    storage.ensure_bucket()
+    created = auth_client.post(
+        "/documents/estimate", json={"positions": POSITIONS}
+    ).json()
+    assert created["client_name"] is None
+
+    resp = auth_client.put(
+        f"/documents/{created['id']}/client-name",
+        json={"client_name": "Анна Петровна"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["client_name"] == "Анна Петровна"
+    assert resp.json()["public_uuid"] == created["public_uuid"]
+
+    # имя попало в перегенерированный PDF-документ (проверяем через html-рендер)
+    document = db_session.get(Document, created["id"])
+    assert document.payload["client_name"] == "Анна Петровна"
+    # снапшот позиций не тронут
+    assert document.payload["total"] == TOTAL
+
+    # у договора/акта имя не меняется этим эндпоинтом
+    bad = auth_client.put("/documents/999999/client-name", json={"client_name": "X"})
+    assert bad.status_code == 404

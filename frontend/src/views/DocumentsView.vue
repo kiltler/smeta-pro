@@ -2,8 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  FileText, Link2, Copy, Check, FileDown, FileSignature,
-  Wallet, RefreshCw, Files,
+  Link2, Copy, Check, FileDown, FileSignature,
+  RefreshCw, Files, MoreHorizontal, UserRoundPlus,
 } from 'lucide-vue-next'
 import { api, getToken } from '../api.js'
 import BottomSheet from '../components/BottomSheet.vue'
@@ -75,6 +75,66 @@ async function duplicate(d) {
   }
 }
 
+// ---------- два главных действия по статусу, остальное — в меню «⋯» ----------
+const menuDoc = ref(null) // документ, для которого открыто меню
+
+function primaryActions(d) {
+  if (d.type !== 'estimate') return ['pdf']
+  if (d.status === 'approved') {
+    return [canContract(d) ? 'contract' : 'link', 'paid']
+  }
+  if (d.status === 'paid') {
+    return [canContract(d) ? 'contract' : 'link', 'pdf']
+  }
+  return ['link', 'pdf'] // draft | sent
+}
+
+function menuActions(d) {
+  if (d.type !== 'estimate') return []
+  const all = ['link', 'pdf', ...(canContract(d) ? ['contract'] : []), 'duplicate']
+  return all.filter((a) => !primaryActions(d).includes(a))
+}
+
+function runAction(action, d) {
+  menuDoc.value = null
+  if (action === 'link') shareLink(d)
+  else if (action === 'pdf') openPdf(d)
+  else if (action === 'contract') openContractForm(d)
+  else if (action === 'duplicate') duplicate(d)
+  else if (action === 'paid') markPaid(d)
+}
+
+const ACTION_META = {
+  link: { label: 'Ссылка клиенту', icon: Link2 },
+  pdf: { label: 'PDF', icon: FileDown },
+  contract: { label: 'Договор + акт', icon: FileSignature },
+  duplicate: { label: 'Дублировать', icon: Copy },
+  paid: { label: 'Оплачено', icon: Check },
+}
+
+// ---------- имя заказчика: не указано → тихая кнопка «+ имя заказчика» ----------
+const nameForm = ref(null) // {docId, value}
+const savingName = ref(false)
+
+async function saveClientName() {
+  const f = nameForm.value
+  if (!f.value.trim()) return
+  savingName.value = true
+  try {
+    await api(`/documents/${f.docId}/client-name`, {
+      method: 'PUT',
+      body: { client_name: f.value.trim() },
+    })
+    nameForm.value = null
+    toast('Имя заказчика добавлено')
+    await load()
+  } catch (e) {
+    toast(e.message, 'error')
+  } finally {
+    savingName.value = false
+  }
+}
+
 // ---------- договор и акт из согласованной сметы ----------
 const hasChildren = (d) => docs.value.some((x) => x.parent_id === d.id)
 const canContract = (d) =>
@@ -143,11 +203,11 @@ async function markPaid(d) {
 <template>
   <div class="screen">
     <h1>Документы</h1>
-  
+
     <div class="ptr" :class="{ active: pulling }" aria-hidden="true"><RefreshCw :size="18" /></div>
-  
+
     <SkeletonList v-if="loading" :rows="4" />
-  
+
     <EmptyState
       v-else-if="docs.length === 0"
       text="Пока нет документов — соберите первую смету"
@@ -156,7 +216,7 @@ async function markPaid(d) {
     >
       <template #icon><Files :size="40" :stroke-width="1.5" /></template>
     </EmptyState>
-  
+
     <div v-else class="stagger">
       <div
         v-for="d in docs" :key="d.id" class="card doc-card"
@@ -173,45 +233,84 @@ async function markPaid(d) {
             {{ STATUS[d.status].text }}
           </span>
         </div>
-  
+
         <div class="doc-meta">
-          <span class="grow muted">
-            {{ d.client_name || 'Без имени заказчика' }}
-            <template v-if="d.type === 'estimate'">
-              · <template v-if="isExpired(d)">срок ссылки истёк</template>
-              <template v-else>ссылка до {{ fmtDate(d.expires_at) }}</template>
+          <span class="grow">
+            <template v-if="d.client_name">
+              <span>{{ d.client_name }}</span>
             </template>
+            <button
+              v-else-if="d.type === 'estimate'" class="add-name"
+              @click="nameForm = { docId: d.id, value: '' }"
+            >
+              <UserRoundPlus :size="14" aria-hidden="true" /> имя заказчика
+            </button>
           </span>
           <span class="total">{{ money(d.total) }}</span>
         </div>
-  
-        <div v-if="d.type === 'estimate' && d.status === 'paid'" class="paid-note">
-          <Wallet :size="15" aria-hidden="true" /> Оплачена — не забудьте чек в «Мой налог»
+        <div v-if="d.type === 'estimate'" class="muted link-note">
+          <template v-if="isExpired(d)">срок ссылки истёк</template>
+          <template v-else>ссылка до {{ fmtDate(d.expires_at) }}</template>
         </div>
-  
+
+        <div v-if="d.type === 'estimate' && d.status === 'paid'" class="paid-note">
+          <Check :size="15" aria-hidden="true" /> Оплачена — не забудьте чек в «Мой налог»
+        </div>
+
         <div class="doc-actions">
           <button
-            v-if="d.type === 'estimate'" class="small soft"
-            :disabled="isExpired(d)" @click="shareLink(d)"
+            v-for="a in primaryActions(d)" :key="a"
+            class="small" :class="a === 'link' || a === 'contract' ? 'soft' : 'secondary'"
+            :disabled="a === 'link' && isExpired(d)"
+            @click="runAction(a, d)"
           >
-            <Check v-if="copiedId === d.id" :size="15" />
-            <Link2 v-else :size="15" />
-            {{ copiedId === d.id ? 'Скопирована' : 'Ссылка клиенту' }}
+            <Check v-if="a === 'link' && copiedId === d.id" :size="15" />
+            <component v-else :is="ACTION_META[a].icon" :size="15" />
+            {{ a === 'link' && copiedId === d.id ? 'Скопирована' : ACTION_META[a].label }}
           </button>
-          <button class="small secondary" @click="openPdf(d)"><FileDown :size="15" /> PDF</button>
-          <template v-if="d.type === 'estimate'">
-            <button v-if="canContract(d)" class="small soft" @click="openContractForm(d)">
-              <FileSignature :size="15" /> Договор + акт
-            </button>
-            <button v-if="d.status === 'approved'" class="small secondary" @click="markPaid(d)">
-              <Wallet :size="15" /> Оплачено
-            </button>
-            <button class="small secondary" @click="duplicate(d)"><Copy :size="15" /> Дублировать</button>
-          </template>
+          <button
+            v-if="menuActions(d).length" class="small secondary more-btn"
+            aria-label="Ещё действия" @click="menuDoc = d"
+          >
+            <MoreHorizontal :size="18" />
+          </button>
         </div>
       </div>
     </div>
-  
+
+    <!-- Шторка: остальные действия документа -->
+    <BottomSheet
+      :open="Boolean(menuDoc)"
+      :title="menuDoc ? `${TYPE[menuDoc.type]} № ${menuDoc.id}` : ''"
+      @close="menuDoc = null"
+    >
+      <template v-if="menuDoc">
+        <button
+          v-for="a in menuActions(menuDoc)" :key="a"
+          class="menu-item" :disabled="a === 'link' && isExpired(menuDoc)"
+          @click="runAction(a, menuDoc)"
+        >
+          <component :is="ACTION_META[a].icon" :size="18" aria-hidden="true" />
+          {{ ACTION_META[a].label }}
+        </button>
+      </template>
+    </BottomSheet>
+
+    <!-- Шторка: имя заказчика задним числом -->
+    <BottomSheet :open="Boolean(nameForm)" title="Имя заказчика" @close="nameForm = null">
+      <template v-if="nameForm">
+        <label>Попадёт в смету и на страницу клиента</label>
+        <input
+          v-model="nameForm.value" placeholder="Сергей, ул. Ленина 5"
+          @keyup.enter="saveClientName"
+        />
+        <button
+          class="cta" style="margin-top: 16px"
+          :disabled="savingName || !nameForm.value.trim()" @click="saveClientName"
+        >{{ savingName ? 'Сохраняю…' : 'Сохранить' }}</button>
+      </template>
+    </BottomSheet>
+
     <!-- Шторка: заказчик для договора и акта -->
     <BottomSheet
       :open="Boolean(contractForm)"
@@ -243,7 +342,7 @@ async function markPaid(d) {
         >{{ savingContract ? 'Создаю…' : 'Создать договор и акт' }}</button>
       </template>
     </BottomSheet>
-  
+
     <!-- Шторка: напоминание про чек НПД (штраф за отсутствие чека — 20% суммы) -->
     <BottomSheet :open="taxReminder" title="Не забудьте чек в «Мой налог»" @close="taxReminder = false">
       <p class="muted" style="margin: 4px 0 16px">
@@ -257,7 +356,19 @@ async function markPaid(d) {
 
 <style scoped>
 .doc-head { display: flex; align-items: flex-start; gap: var(--s3); }
-.doc-meta { display: flex; align-items: baseline; gap: var(--s3); margin: var(--s2) 0 var(--s3); }
+.doc-meta { display: flex; align-items: baseline; gap: var(--s3); margin: var(--s2) 0 2px; }
+.doc-meta .grow { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; min-width: 0; }
+.link-note { margin-bottom: var(--s3); }
+
+/* тихая кнопка «+ имя заказчика» */
+.add-name {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: none; color: var(--text-3);
+  width: auto; min-height: 28px; padding: 2px 6px 2px 0;
+  font-size: 13px; font-weight: 500;
+}
+.add-name:active { color: var(--accent); background: none; transform: none; }
+
 .paid-note {
   display: flex; align-items: center; gap: 6px;
   font-size: 13px; font-weight: 600; color: var(--success);
@@ -267,7 +378,21 @@ async function markPaid(d) {
 }
 .doc-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .doc-actions button { display: inline-flex; align-items: center; gap: 6px; }
+.more-btn { min-width: 44px; padding: 0; justify-content: center; }
 .fresh { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+/* пункты меню «⋯» в шторке */
+.menu-item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; min-height: var(--touch);
+  background: none; color: var(--text);
+  font-size: 16px; font-weight: 500; text-align: left;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0; padding: 0 4px;
+}
+.menu-item:last-child { border-bottom: none; }
+.menu-item:active { background: var(--surface-2); transform: none; }
+.menu-item svg { color: var(--text-2); }
 
 .segment {
   display: flex; gap: 4px; padding: 4px;

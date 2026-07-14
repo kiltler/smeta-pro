@@ -108,6 +108,18 @@
   }
   .pdf { background: var(--surface-2); color: var(--text); margin-top: 10px; }
 
+  /* реквизиты — раз в жизни: прячем под спойлер, не грузим заказчика */
+  .req { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .req summary {
+    cursor: pointer; color: var(--text-2); font-size: 14px; font-weight: 600;
+    list-style: none; display: flex; align-items: center; gap: 6px;
+    min-height: 32px;
+  }
+  .req summary::-webkit-details-marker { display: none; }
+  .req summary::after { content: "▾"; font-size: 12px; transition: transform 150ms ease; }
+  .req[open] summary::after { transform: rotate(180deg); }
+  .req-body { white-space: pre-line; color: var(--text-2); font-size: 13.5px; margin-top: 8px; }
+
   .footer {
     text-align: center; margin-top: 26px;
     font-size: 12.5px; color: var(--text-2);
@@ -166,7 +178,10 @@
       <tr class="total"><td>Итого</td><td class="num money">{{ total | money }}&nbsp;₽</td></tr>
     </table>
     {% if contractor_lines %}
-    <div class="muted" style="white-space: pre-line; margin-top: 14px">{{ contractor_lines }}</div>
+    <details class="req">
+      <summary>Реквизиты исполнителя</summary>
+      <div class="req-body">{{ contractor_lines }}</div>
+    </details>
     {% endif %}
 
     {% if status == 'approved' %}

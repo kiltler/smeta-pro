@@ -175,6 +175,25 @@ def create_contract_act(
     return ContractActOut(contract=_to_out(contract), act=_to_out(act))
 
 
+class ClientNameIn(BaseModel):
+    client_name: str = Field(min_length=1, max_length=200)
+
+
+@router.put("/{doc_id}/client-name", response_model=DocumentOut)
+def set_client_name(
+    doc_id: int,
+    data: ClientNameIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Дописать имя заказчика к смете (создана без имени — добавили позже)."""
+    document = _get_own(db, user, doc_id)
+    if document.type != "estimate":
+        raise HTTPException(status_code=400, detail="Имя заказчика меняется только у сметы")
+    doc_service.set_client_name(db, document, data.client_name.strip())
+    return _to_out(document)
+
+
 @router.post("/{doc_id}/mark-paid", response_model=DocumentOut)
 def mark_paid(doc_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Отметка «оплачено». Фронт после неё напоминает про чек в «Мой налог»."""

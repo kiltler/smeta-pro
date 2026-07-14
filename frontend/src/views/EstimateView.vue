@@ -310,8 +310,10 @@ async function confirmReview() {
     <header class="hero est-hero" :class="{ compact }">
       <p class="hello">{{ greeting }}</p>
       <div class="today">
-        <span class="today-sum">{{ money(todayTotal) }}</span>
-        <span class="today-label">сегодня в сметах · {{ todayDate }}</span>
+        <!-- ноль не показываем: цифра появляется, когда она греет -->
+        <span v-if="todayTotal > 0" class="today-sum">{{ money(todayTotal) }}</span>
+        <span v-else class="today-call">Соберите первую смету за сегодня</span>
+        <span class="today-label">{{ todayTotal > 0 ? 'сегодня в сметах · ' : '' }}{{ todayDate }}</span>
       </div>
     </header>
   
@@ -528,6 +530,11 @@ async function confirmReview() {
   transition: font-size 220ms var(--ease);
 }
 .est-hero .today-label { color: var(--on-hero-2); font-size: 13px; }
+.est-hero .today-call {
+  font-size: 21px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em;
+  transition: font-size 220ms var(--ease);
+}
+.est-hero.compact .today-call { font-size: 16px; }
 .est-hero.compact {
   padding-top: 10px; padding-bottom: 12px;
   border-radius: 0 0 18px 18px;

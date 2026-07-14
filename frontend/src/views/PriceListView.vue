@@ -5,6 +5,7 @@ import { api } from '../api.js'
 import BottomSheet from '../components/BottomSheet.vue'
 import EmptyState from '../components/EmptyState.vue'
 import SkeletonList from '../components/SkeletonList.vue'
+import Money from '../components/Money.vue'
 import { usePullRefresh } from '../composables/pullRefresh.js'
 import { money, toast } from '../composables/ui.js'
 
@@ -109,7 +110,7 @@ async function removeItem() {
       >
         <span class="grow">
           <span class="item-name">{{ item.name }}</span>
-          <span class="muted item-sub"><span class="money" style="font-weight: 600">{{ money(item.price) }}</span> / {{ item.unit }}</span>
+          <span class="muted item-sub"><Money :value="item.price" style="font-weight: 600" /> / {{ item.unit }}</span>
         </span>
         <Pencil :size="16" class="edit-ic" aria-hidden="true" />
       </button>
@@ -131,7 +132,7 @@ async function removeItem() {
           </div>
           <div>
             <label>Цена, ₽</label>
-            <input v-model="editor.price" inputmode="numeric" />
+            <input v-model="editor.price" inputmode="decimal" />
           </div>
         </div>
         <button

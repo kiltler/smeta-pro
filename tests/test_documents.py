@@ -177,3 +177,39 @@ def test_set_client_name_later(auth_client, db_session):
     # у договора/акта имя не меняется этим эндпоинтом
     bad = auth_client.put("/documents/999999/client-name", json={"client_name": "X"})
     assert bad.status_code == 404
+
+
+def test_public_page_header_is_master_brand(client, auth_client):
+    """Шапка клиентской страницы — бренд мастера; без бренда — ФИО.
+    «СметаПро» на странице только в футере, не в шапке."""
+    storage.ensure_bucket()
+    auth_client.put(
+        "/profile",
+        json={
+            "brand_name": "КлиматДВ",
+            "full_name": "Иванов Иван Иванович",
+            "inn": "272000000000",
+            "requisites": {"text": "р/с 40802810000000000001"},
+        },
+    )
+    doc = auth_client.post("/documents/estimate", json={"positions": POSITIONS}).json()
+    page = client.get(f"/e/{doc['public_uuid']}").text
+    head, _, tail = page.partition('class="footer"')
+    assert "КлиматДВ" in head
+    assert "СметаПро" not in head  # наш бренд — только в футере
+    assert "СметаПро" in tail
+
+    # фолбэк: бренд стёрт → в шапке ФИО
+    auth_client.put(
+        "/profile",
+        json={
+            "brand_name": "",
+            "full_name": "Иванов Иван Иванович",
+            "inn": "272000000000",
+            "requisites": {"text": ""},
+        },
+    )
+    page2 = client.get(f"/e/{doc['public_uuid']}").text
+    head2 = page2.partition('class="footer"')[0]
+    assert "Иванов Иван Иванович" in head2
+    assert "СметаПро" not in head2

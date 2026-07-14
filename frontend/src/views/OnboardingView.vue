@@ -20,11 +20,12 @@ const items = ref([])
 
 onMounted(async () => {
   const p = await api('/profile')
+  // не затираем то, что пользователь успел ввести до ответа сервера
   profile.value = {
-    brand_name: p.brand_name || '',
-    full_name: p.full_name || '',
-    inn: p.inn || '',
-    requisites: { text: p.requisites?.text || '' },
+    brand_name: profile.value.brand_name || p.brand_name || '',
+    full_name: profile.value.full_name || p.full_name || '',
+    inn: profile.value.inn || p.inn || '',
+    requisites: { text: profile.value.requisites.text || p.requisites?.text || '' },
   }
   if (p.has_logo) logoUrl.value = await fetchLogoUrl()
 })
@@ -138,7 +139,7 @@ function finish() {
             <div class="muted">₽ / {{ item.unit }}</div>
           </div>
           <input
-            v-model="item.price" class="price-input" inputmode="numeric"
+            v-model="item.price" class="price-input" inputmode="decimal"
             :aria-label="`Цена: ${item.name}`"
             @change="savePrice(item)"
           />

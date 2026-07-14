@@ -60,6 +60,18 @@
           "Segoe UI", system-ui, sans-serif;
   --dur: 200ms;                  /* базовая длительность переходов */
   --ease: cubic-bezier(0.2, 0.8, 0.3, 1);
+
+  /* --- добавлено при финальной полировке (существующие токены не менялись) --- */
+  --accent-grad-b: #5b54e8;            /* пара акцента для градиентных кнопок */
+  --accent-row: rgba(46, 95, 232, 0.05);  /* подложка активной строки (~4% акцента) */
+  --nav-pill: rgba(46, 95, 232, 0.10);    /* pill активного таба (~8% акцента) */
+  --on-success: #ffffff;               /* текст на success-фоне (бейдж «Оплачена») */
+  /* мягкие цветные круги глифов комплектов (оттенок детерминирован id) */
+  --chip0-bg: #e8eefe; --chip0-fg: #2e5fe8;
+  --chip1-bg: #e6f6ee; --chip1-fg: #189a58;
+  --chip2-bg: #f3ecfd; --chip2-fg: #7a4de8;
+  --chip3-bg: #fdf1e0; --chip3-fg: #b06a00;
+  --chip4-bg: #e9f4fb; --chip4-fg: #0e7ab8;
 }
 
 /* --- тёмная тема: сине-графит, карточки на тон светлее --- */
@@ -100,6 +112,16 @@
   --backdrop: rgba(2, 4, 10, 0.6);
   --skeleton-a: #1c2637;
   --skeleton-b: #243044;
+  /* --- добавлено при финальной полировке --- */
+  --accent-grad-b: #7a63ff;
+  --accent-row: rgba(95, 139, 255, 0.08);
+  --nav-pill: rgba(95, 139, 255, 0.14);
+  --on-success: #0b1712;               /* тёмный текст: белый на зелёном не читался */
+  --chip0-bg: #1c2b4d; --chip0-fg: #8caeff;
+  --chip1-bg: #143526; --chip1-fg: #3ecf82;
+  --chip2-bg: #2a2150; --chip2-fg: #b39aff;
+  --chip3-bg: #33290f; --chip3-fg: #f0b64a;
+  --chip4-bg: #0f2c3f; --chip4-fg: #5ec1f2;
 }
 
 /* системная тема: те же значения, что [data-theme="dark"] */
@@ -135,5 +157,16 @@
     --backdrop: rgba(2, 4, 10, 0.6);
     --skeleton-a: #1c2637;
     --skeleton-b: #243044;
+
+  /* --- добавлено при финальной полировке --- */
+    --accent-grad-b: #7a63ff;
+    --accent-row: rgba(95, 139, 255, 0.08);
+    --nav-pill: rgba(95, 139, 255, 0.14);
+    --on-success: #0b1712;               /* тёмный текст: белый на зелёном не читался */
+    --chip0-bg: #1c2b4d; --chip0-fg: #8caeff;
+    --chip1-bg: #143526; --chip1-fg: #3ecf82;
+    --chip2-bg: #2a2150; --chip2-fg: #b39aff;
+    --chip3-bg: #33290f; --chip3-fg: #f0b64a;
+    --chip4-bg: #0f2c3f; --chip4-fg: #5ec1f2;
   }
 }

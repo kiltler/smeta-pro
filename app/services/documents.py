@@ -157,7 +157,12 @@ def _template_context(document: Document, profile: Profile | None) -> dict:
         "public_uuid": document.public_uuid,
         "created_date": document.created_at.strftime("%d.%m.%Y"),
         "valid_until": document.expires_at.strftime("%d.%m.%Y"),
-        "brand_name": (profile.brand_name if profile else None) or "СметаПро",
+        # шапка — всегда бренд МАСТЕРА; нет бренда — ФИО. Наше имя — только футер.
+        "brand_name": (
+            (profile.brand_name if profile else None)
+            or (profile.full_name if profile else None)
+            or "Исполнитель"
+        ),
         "full_name": profile.full_name if profile else None,
         "contractor_lines": contractor_lines,
         "logo_data_uri": logo_data_uri,

@@ -9,6 +9,7 @@ import { api, getToken } from '../api.js'
 import BottomSheet from '../components/BottomSheet.vue'
 import EmptyState from '../components/EmptyState.vue'
 import SkeletonList from '../components/SkeletonList.vue'
+import Money from '../components/Money.vue'
 import { usePullRefresh } from '../composables/pullRefresh.js'
 import { haptic, money, toast } from '../composables/ui.js'
 
@@ -210,8 +211,8 @@ async function markPaid(d) {
 
     <EmptyState
       v-else-if="docs.length === 0"
-      text="Пока нет документов — соберите первую смету"
-      action="К смете"
+      text="Здесь появятся ваши сметы"
+      action="Создать первую"
       @action="router.push('/new')"
     >
       <template #icon><Files :size="40" :stroke-width="1.5" /></template>
@@ -235,22 +236,20 @@ async function markPaid(d) {
         </div>
 
         <div class="doc-meta">
-          <span class="grow">
-            <template v-if="d.client_name">
-              <span>{{ d.client_name }}</span>
-            </template>
+          <div class="doc-name grow">
+            <span v-if="d.client_name" class="client-name">{{ d.client_name }}</span>
             <button
               v-else-if="d.type === 'estimate'" class="add-name"
               @click="nameForm = { docId: d.id, value: '' }"
             >
               <UserRoundPlus :size="14" aria-hidden="true" /> имя заказчика
             </button>
-          </span>
-          <span class="total">{{ money(d.total) }}</span>
-        </div>
-        <div v-if="d.type === 'estimate'" class="muted link-note">
-          <template v-if="isExpired(d)">срок ссылки истёк</template>
-          <template v-else>ссылка до {{ fmtDate(d.expires_at) }}</template>
+            <span v-if="d.type === 'estimate'" class="muted link-note">
+              <template v-if="isExpired(d)">срок ссылки истёк</template>
+              <template v-else>ссылка до {{ fmtDate(d.expires_at) }}</template>
+            </span>
+          </div>
+          <Money :value="d.total" class="total doc-sum" />
         </div>
 
         <div v-if="d.type === 'estimate' && d.status === 'paid'" class="paid-note">
@@ -356,9 +355,13 @@ async function markPaid(d) {
 
 <style scoped>
 .doc-head { display: flex; align-items: flex-start; gap: var(--s3); }
-.doc-meta { display: flex; align-items: baseline; gap: var(--s3); margin: var(--s2) 0 2px; }
-.doc-meta .grow { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; min-width: 0; }
-.link-note { margin-bottom: var(--s3); }
+.doc-meta { display: flex; align-items: flex-start; gap: var(--s3); margin: var(--s2) 0 var(--s3); }
+.doc-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.client-name { /* имя — одна строка с многоточием */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.doc-sum { flex: none; white-space: nowrap; } /* сумма никогда не переносится */
+.link-note { font-size: 13px; }
 
 /* тихая кнопка «+ имя заказчика» */
 .add-name {

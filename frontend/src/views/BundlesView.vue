@@ -6,6 +6,7 @@ import BottomSheet from '../components/BottomSheet.vue'
 import EmptyState from '../components/EmptyState.vue'
 import RollingNumber from '../components/RollingNumber.vue'
 import SkeletonList from '../components/SkeletonList.vue'
+import Money from '../components/Money.vue'
 import { usePullRefresh } from '../composables/pullRefresh.js'
 import { money, toast } from '../composables/ui.js'
 
@@ -141,7 +142,7 @@ function partsPreview(bundle) {
           <span class="item-name">{{ bundle.name }}</span>
           <span class="muted item-sub">{{ bundle.items.length }} поз. · {{ partsPreview(bundle) }}</span>
         </span>
-        <span class="money">{{ money(bundleSum(bundle.items)) }}</span>
+        <Money :value="bundleSum(bundle.items)" />
       </button>
     </div>
   
@@ -160,7 +161,7 @@ function partsPreview(bundle) {
           <div v-for="item in priceItems" :key="item.id" class="list-item">
             <div class="grow">
               <div>{{ item.name }}</div>
-              <div class="muted" style="font-size: 13px">{{ money(item.price) }} / {{ item.unit }}</div>
+              <div class="muted" style="font-size: 13px"><Money :value="item.price" style="font-weight: 600" /> / {{ item.unit }}</div>
               <label v-if="editor.parts.has(item.id)" class="ask-row">
                 <input
                   type="checkbox"

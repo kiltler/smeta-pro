@@ -50,5 +50,6 @@ export function money(value) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })
-  return `${text} ₽`
+  // перед ₽ — узкий неразрывный пробел U+202F
+  return `${text} ₽`
 }

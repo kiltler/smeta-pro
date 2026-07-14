@@ -4,9 +4,11 @@ import { useRouter } from 'vue-router'
 import {
   Mic, Square, Search, X, Sparkles, LayoutGrid, Keyboard,
   ShoppingCart, Trash2, TriangleAlert,
+  AirVent, Wrench, Snowflake, Truck, Hammer,
 } from 'lucide-vue-next'
 import { api } from '../api.js'
 import BottomSheet from '../components/BottomSheet.vue'
+import Money from '../components/Money.vue'
 import RollingNumber from '../components/RollingNumber.vue'
 import SkeletonList from '../components/SkeletonList.vue'
 import { flyToCart, haptic, money, toast } from '../composables/ui.js'
@@ -62,7 +64,7 @@ const onScroll = () => (compact.value = window.scrollY > 24)
 onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
 onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
 
-// ---------- поиск ----------
+// ---------- поиск: фильтрует обе секции, совпадение подсвечивается ----------
 const search = ref('')
 const q = computed(() => search.value.trim().toLowerCase())
 const matches = (i) =>
@@ -72,6 +74,18 @@ const filteredItems = computed(() => (q.value ? priceItems.value.filter(matches)
 const filteredBundles = computed(() =>
   q.value ? sortedBundles.value.filter((b) => b.name.toLowerCase().includes(q.value)) : sortedBundles.value
 )
+
+// разбивка названия на сегменты для <mark>
+function hl(name) {
+  if (!q.value) return [{ t: name, m: false }]
+  const idx = name.toLowerCase().indexOf(q.value)
+  if (idx === -1) return [{ t: name, m: false }]
+  return [
+    { t: name.slice(0, idx), m: false },
+    { t: name.slice(idx, idx + q.value.length), m: true },
+    { t: name.slice(idx + q.value.length), m: false },
+  ].filter((p) => p.t)
+}
 
 // ---------- корзина сметы (живёт в localStorage до создания документа) ----------
 const CART_KEY = 'smeta_cart'
@@ -127,6 +141,19 @@ function bundleSum(bundle) {
   return bundle.items.reduce(
     (sum, p) => sum + Number(itemById.value[p.price_item_id]?.price || 0) * p.qty_default, 0
   )
+}
+
+// глиф и оттенок круга — детерминированно по id комплекта
+const GLYPHS = [AirVent, Wrench, Snowflake, Truck, Hammer]
+const glyphFor = (id) => GLYPHS[id % GLYPHS.length]
+const hueFor = (id) => `hue-${id % 5}`
+
+function positionsLabel(n) {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return `${n} позиция`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} позиции`
+  return `${n} позиций`
 }
 
 // мини-диалог «сколько метров?» для ask_qty-позиций комплекта
@@ -311,12 +338,12 @@ async function confirmReview() {
       <p class="hello">{{ greeting }}</p>
       <div class="today">
         <!-- ноль не показываем: цифра появляется, когда она греет -->
-        <span v-if="todayTotal > 0" class="today-sum">{{ money(todayTotal) }}</span>
-        <span v-else class="today-call">Соберите первую смету за сегодня</span>
+        <RollingNumber v-if="todayTotal > 0" :value="todayTotal" class="today-sum" />
+        <span v-else class="today-call">Соберите первую смету</span>
         <span class="today-label">{{ todayTotal > 0 ? 'сегодня в сметах · ' : '' }}{{ todayDate }}</span>
       </div>
     </header>
-  
+
     <!-- Экран проверки распознанного (обязателен перед добавлением) -->
     <template v-if="review">
       <h1>Проверьте распознанное</h1>
@@ -327,7 +354,7 @@ async function confirmReview() {
         <div v-for="(p, i) in review.positions" :key="p.price_item_id" class="card review-pos">
           <div class="grow">
             <div class="pos-name">{{ p.name }}</div>
-            <div class="muted">{{ money(p.price) }} / {{ p.unit }}</div>
+            <div class="muted"><Money :value="p.price" style="font-weight: 600" /> / {{ p.unit }}</div>
           </div>
           <input v-model="p.qty" inputmode="decimal" class="qty-input" :aria-label="`Количество: ${p.name}`" />
           <button class="icon-btn danger" :aria-label="`Убрать ${p.name}`" @click="removeReviewPosition(i)">
@@ -347,9 +374,9 @@ async function confirmReview() {
       </button>
       <button class="ghost" style="margin-top: 8px" @click="review = null">Отмена</button>
     </template>
-  
+
     <template v-else>
-      <!-- Поиск сверху -->
+      <!-- Поиск сверху: фильтрует и комплекты, и позиции -->
       <div class="search-wrap">
         <Search :size="18" class="search-icon" aria-hidden="true" />
         <input
@@ -357,7 +384,7 @@ async function confirmReview() {
           aria-label="Поиск по прайсу и комплектам"
         />
       </div>
-  
+
       <!-- Режимы ввода (Голос/Текст — за фиче-флагом PARSE_ENABLED) -->
       <div v-if="parseEnabled" class="segment" role="tablist" aria-label="Режим ввода">
         <button role="tab" :aria-selected="tab === 'templates'" :class="{ active: tab === 'templates' }" @click="tab = 'templates'">
@@ -370,30 +397,45 @@ async function confirmReview() {
           <Keyboard :size="16" /> Текст
         </button>
       </div>
-  
+
       <!-- ШАБЛОНЫ -->
       <template v-if="tab === 'templates' || !parseEnabled">
         <SkeletonList v-if="loading" :rows="6" />
         <template v-else>
+          <h2 v-if="filteredBundles.length" class="sec-label">Комплекты</h2>
           <div class="bundle-grid stagger">
             <button
               v-for="bundle in filteredBundles" :key="bundle.id"
               class="bundle-card" @click="tapBundle(bundle, $event)"
             >
-              <span class="bundle-name">{{ bundle.name }}</span>
-              <span class="bundle-price money">{{ money(bundleSum(bundle)) }}</span>
+              <span class="glyph" :class="hueFor(bundle.id)" aria-hidden="true">
+                <component :is="glyphFor(bundle.id)" :size="19" :stroke-width="2" />
+              </span>
+              <span class="b-body">
+                <span class="b-name">
+                  <template v-for="(part, i) in hl(bundle.name)" :key="i"><mark v-if="part.m">{{ part.t }}</mark><template v-else>{{ part.t }}</template></template>
+                </span>
+                <span class="b-sub">{{ positionsLabel(bundle.items.length) }}</span>
+                <Money :value="bundleSum(bundle)" class="b-price" />
+              </span>
             </button>
           </div>
-  
+
+          <h2 v-if="filteredItems.length" class="sec-label">Позиции</h2>
           <div class="card">
-            <div v-for="item in filteredItems" :key="item.id" class="list-item">
+            <div
+              v-for="item in filteredItems" :key="item.id"
+              class="list-item pos-row" :class="{ picked: cartQty(item.id) > 0 }"
+            >
               <div class="grow">
-                <div>{{ item.name }}</div>
-                <div class="muted"><span class="money" style="font-weight:600">{{ money(item.price) }}</span> / {{ item.unit }}</div>
+                <div>
+                  <template v-for="(part, i) in hl(item.name)" :key="i"><mark v-if="part.m">{{ part.t }}</mark><template v-else>{{ part.t }}</template></template>
+                </div>
+                <div class="muted"><Money :value="item.price" style="font-weight: 600" /> / {{ item.unit }}</div>
               </div>
               <div class="stepper">
                 <button type="button" :aria-label="`Убрать ${item.name}`" @click="addPriceItem(item, -1, $event)">−</button>
-                <span class="qty">{{ cartQty(item.id) }}</span>
+                <span class="qty" :class="{ 'qty-on': cartQty(item.id) > 0 }">{{ cartQty(item.id) }}</span>
                 <button type="button" :aria-label="`Добавить ${item.name}`" @click="addPriceItem(item, 1, $event)">+</button>
               </div>
             </div>
@@ -403,7 +445,7 @@ async function confirmReview() {
           </div>
         </template>
       </template>
-  
+
       <!-- ГОЛОС -->
       <div v-else-if="tab === 'voice'" class="card">
         <template v-if="voiceSupported">
@@ -426,7 +468,7 @@ async function confirmReview() {
           {{ parsing ? 'Распознаю…' : 'Распознать позиции' }}
         </button>
       </div>
-  
+
       <!-- ТЕКСТ -->
       <div v-else class="card">
         <label>Опишите работы своими словами</label>
@@ -440,25 +482,25 @@ async function confirmReview() {
         </button>
       </div>
     </template>
-  
+
     <!-- Стеклянный итог сметы: прилипает над навигацией -->
     <div v-if="cartCount && !review" id="cart-anchor" class="glass cart-bar">
       <button class="cart-open ghost" @click="cartOpen = true" :aria-label="`Открыть смету, позиций: ${cartCount}`">
         <ShoppingCart :size="20" aria-hidden="true" />
         <span class="cart-info">
           <RollingNumber :value="cartTotal" />
-          <span class="cart-count">{{ cartCount }} поз.</span>
+          <span class="cart-count">{{ positionsLabel(cartCount) }}</span>
         </span>
       </button>
       <button class="cart-go" @click="checkout = true">Оформить</button>
     </div>
-  
+
     <!-- Шторка: состав сметы -->
     <BottomSheet :open="cartOpen" title="Смета" @close="cartOpen = false">
       <div v-for="p in cart" :key="p.price_item_id" class="list-item">
         <div class="grow">
           <div>{{ p.name }}</div>
-          <div class="muted">{{ money(p.price) }} × {{ p.qty }} {{ p.unit }}</div>
+          <div class="muted"><Money :value="p.price" style="font-weight: 600" /> × {{ p.qty }} {{ p.unit }}</div>
         </div>
         <div class="stepper">
           <button type="button" :aria-label="`Убрать ${p.name}`" @click="addToCart(p, -1)">−</button>
@@ -476,7 +518,7 @@ async function confirmReview() {
         Оформить смету
       </button>
     </BottomSheet>
-  
+
     <!-- Шторка: «сколько метров?» -->
     <BottomSheet :open="Boolean(askDialog)" :title="askDialog?.bundle.name" @close="askDialog = null">
       <template v-if="askDialog">
@@ -487,7 +529,7 @@ async function confirmReview() {
         <button class="cta" style="margin-top: 16px" @click="confirmAskDialog">Добавить</button>
       </template>
     </BottomSheet>
-  
+
     <!-- Шторка: оформление -->
     <BottomSheet :open="checkout" title="Оформить смету" @close="checkout = false">
       <label>Заказчик / объект (попадёт в смету, можно пропустить)</label>
@@ -500,7 +542,7 @@ async function confirmReview() {
         {{ creating ? 'Создаю PDF…' : 'Создать смету' }}
       </button>
     </BottomSheet>
-  
+
     <!-- Шторка: пейволл, спокойный, без таймеров -->
     <BottomSheet :open="paywall" title="Создано 3 документа в этом месяце" @close="paywall = false">
       <p class="muted" style="margin: 4px 0 16px">
@@ -524,17 +566,17 @@ async function confirmReview() {
 }
 .est-hero .hello { margin: 0 0 4px; color: var(--on-hero-2); font-size: 15px; }
 .est-hero .today { display: flex; flex-direction: column; gap: 2px; }
-.est-hero .today-sum {
-  font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+.est-hero :deep(.today-sum) {
+  font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em; color: var(--on-hero);
   transition: font-size 220ms var(--ease);
 }
 .est-hero .today-label { color: var(--on-hero-2); font-size: 13px; }
 .est-hero .today-call {
-  font-size: 21px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em;
+  font-size: 22px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em;
+  white-space: nowrap;
   transition: font-size 220ms var(--ease);
 }
-.est-hero.compact .today-call { font-size: 16px; }
 .est-hero.compact {
   padding-top: 10px; padding-bottom: 12px;
   border-radius: 0 0 18px 18px;
@@ -542,7 +584,8 @@ async function confirmReview() {
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
-.est-hero.compact .today-sum { font-size: 22px; }
+.est-hero.compact :deep(.today-sum) { font-size: 22px; }
+.est-hero.compact .today-call { font-size: 16px; }
 .est-hero.compact .hello { display: none; }
 
 /* --- поиск --- */
@@ -566,23 +609,52 @@ async function confirmReview() {
 }
 .segment button.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
 
-/* --- комплекты: карточки с итогом --- */
+/* --- комплекты: глиф в цветном круге, имя ≤2 строк, цена крупно --- */
 .bundle-grid {
   display: grid; grid-template-columns: 1fr 1fr;
-  gap: var(--s3); margin-bottom: var(--s3);
+  gap: var(--s3); margin-bottom: var(--s2);
 }
 .bundle-card {
-  min-height: 86px;
-  display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between;
-  gap: var(--s2); padding: var(--s3) 14px;
+  min-height: 96px;
+  display: flex; align-items: flex-start; gap: var(--s3);
+  padding: var(--s3) 14px;
   text-align: left;
   background: var(--surface); color: var(--text);
   border: 1px solid var(--border); border-radius: var(--r);
   box-shadow: var(--shadow-card);
+  transition: transform 120ms var(--ease), box-shadow 120ms var(--ease);
 }
-.bundle-card:active { background: var(--surface-2); transform: scale(0.98); }
-.bundle-name { font-size: 15px; font-weight: 600; line-height: 1.3; }
-.bundle-price { color: var(--accent-soft-text); font-size: 15px; }
+.bundle-card:active { transform: scale(0.97); box-shadow: var(--shadow-float); }
+.glyph {
+  width: 38px; height: 38px; border-radius: 50%; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-top: 2px;
+}
+/* оттенок круга детерминирован id комплекта (токены hue) */
+.hue-0 { background: var(--chip0-bg); color: var(--chip0-fg); }
+.hue-1 { background: var(--chip1-bg); color: var(--chip1-fg); }
+.hue-2 { background: var(--chip2-bg); color: var(--chip2-fg); }
+.hue-3 { background: var(--chip3-bg); color: var(--chip3-fg); }
+.hue-4 { background: var(--chip4-bg); color: var(--chip4-fg); }
+.b-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.b-name {
+  font-size: 15px; font-weight: 600; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.b-sub { font-size: 12.5px; color: var(--text-3); }
+.b-price { font-size: 17px; margin-top: 4px; }
+
+/* --- строка позиции в смете (qty > 0): акцентная полоска и подложка --- */
+.pos-row { transition: background 250ms ease, box-shadow 250ms ease; border-radius: 0; }
+.pos-row.picked {
+  background: var(--accent-row);
+  box-shadow: inset 3px 0 0 var(--accent);
+  margin: 0 calc(-1 * var(--s4));
+  padding-left: var(--s4); padding-right: var(--s4);
+}
+.qty { transition: color 200ms ease; }
+.qty-on { color: var(--accent); }
 
 /* --- проверка распознанного --- */
 .review-pos { display: flex; align-items: center; gap: var(--s3); }

@@ -34,4 +34,5 @@ class Profile(Base):
     logo_key: Mapped[str | None] = mapped_column(String(500))
     signature_key: Mapped[str | None] = mapped_column(String(500))
     # Тема интерфейса: light | dark | system (решение владельца: в профиле, не в localStorage)
-    theme: Mapped[str] = mapped_column(String(10), server_default="system")
+    # дефолт — тёмная тема (решение дизайна); у старых пользователей остаётся их выбор
+    theme: Mapped[str] = mapped_column(String(10), server_default="dark")

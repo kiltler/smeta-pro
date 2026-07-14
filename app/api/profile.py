@@ -53,7 +53,7 @@ class ProfileIn(BaseModel):
 
 class ProfileOut(ProfileIn):
     has_logo: bool = False
-    theme: str = "system"
+    theme: str = "dark"
 
 
 def _get_or_create(db: Session, user_id: int) -> Profile:
@@ -75,7 +75,7 @@ def get_profile(user: User = Depends(get_current_user), db: Session = Depends(ge
         inn=profile.inn,
         requisites=profile.requisites or {},
         has_logo=profile.logo_key is not None,
-        theme=profile.theme or "system",
+        theme=profile.theme or "dark",
     )
 
 
@@ -92,7 +92,7 @@ def update_profile(
     return ProfileOut(
         **data.model_dump(),
         has_logo=profile.logo_key is not None,
-        theme=profile.theme or "system",
+        theme=profile.theme or "dark",
     )
 
 

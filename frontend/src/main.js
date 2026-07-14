@@ -5,9 +5,12 @@ import './styles/base.css'
 import { getToken } from './api.js'
 import { loadThemeFromProfile } from './composables/theme.js'
 
-// Тема хранится в профиле (не в localStorage): подтягиваем при старте,
-// до ответа сервера работает системная.
+import { applyTheme } from './composables/theme.js'
+
+// Тема хранится в профиле (не в localStorage): подтягиваем при старте.
+// Дефолт продукта — тёмная: неавторизованные страницы всегда тёмные.
 if (getToken()) loadThemeFromProfile()
+else applyTheme('dark')
 
 createApp(App).use(router).mount('#app')
 

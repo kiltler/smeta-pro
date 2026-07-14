@@ -14,7 +14,7 @@ def test_profile_empty_then_update(auth_client):
         "inn": None,
         "requisites": {},
         "has_logo": False,
-        "theme": "system",
+        "theme": "dark",
     }
 
     data = {
@@ -25,7 +25,7 @@ def test_profile_empty_then_update(auth_client):
     }
     resp = auth_client.put("/profile", json=data)
     assert resp.status_code == 200
-    assert auth_client.get("/profile").json() == {**data, "has_logo": False, "theme": "system"}
+    assert auth_client.get("/profile").json() == {**data, "has_logo": False, "theme": "dark"}
 
 
 def test_inn_validation(auth_client):
@@ -76,10 +76,10 @@ def test_profile_requires_auth(client):
 
 
 def test_theme_stored_in_profile(auth_client):
-    assert auth_client.get("/profile").json()["theme"] == "system"
-    assert auth_client.put("/profile/theme", json={"theme": "dark"}).status_code == 200
-    assert auth_client.get("/profile").json()["theme"] == "dark"
+    assert auth_client.get("/profile").json()["theme"] == "dark"  # дефолт — тёмная
+    assert auth_client.put("/profile/theme", json={"theme": "light"}).status_code == 200
+    assert auth_client.get("/profile").json()["theme"] == "light"
     # PUT /profile не сбрасывает тему
     auth_client.put("/profile", json={"brand_name": "X"})
-    assert auth_client.get("/profile").json()["theme"] == "dark"
+    assert auth_client.get("/profile").json()["theme"] == "light"
     assert auth_client.put("/profile/theme", json={"theme": "neon"}).status_code == 422

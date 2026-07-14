@@ -131,6 +131,17 @@ def build_payload(
 WATERMARK_TEXT = "Создано в СметаПро — smeta-pro.ru"
 
 
+def _logo_data_uri(profile: Profile | None) -> str | None:
+    if not (profile and profile.logo_key):
+        return None
+    try:
+        data, content_type = storage.get_object(profile.logo_key)
+        return f"data:{content_type};base64,{base64.b64encode(data).decode()}"
+    except Exception:
+        logger.warning("Логотип %s не прочитан из хранилища", profile.logo_key)
+        return None
+
+
 def _template_context(document: Document, profile: Profile | None) -> dict:
     requisites_text = (profile.requisites or {}).get("text", "") if profile else ""
     contractor_lines = "\n".join(
@@ -143,15 +154,13 @@ def _template_context(document: Document, profile: Profile | None) -> dict:
         if line
     )
 
-    logo_data_uri = None
-    if profile and profile.logo_key:
-        try:
-            data, content_type = storage.get_object(profile.logo_key)
-            logo_data_uri = f"data:{content_type};base64,{base64.b64encode(data).decode()}"
-        except Exception:
-            logger.warning("Логотип %s не прочитан из хранилища", profile.logo_key)
+    logo_data_uri = _logo_data_uri(profile)
+
+    # тема публичной страницы: явный выбор мастера; «система»/нет выбора → тёмная
+    page_theme = "light" if (profile and profile.theme == "light") else "dark"
 
     return {
+        "page_theme": page_theme,
         "number": document.id,
         "status": document.status,
         "public_uuid": document.public_uuid,
@@ -178,10 +187,17 @@ def render_estimate_html(document: Document, profile: Profile | None) -> str:
     return _env.get_template("pdf/estimate.html").render(_template_context(document, profile))
 
 
-def render_public_page(document: Document, profile: Profile | None) -> str:
-    return _env.get_template("public/estimate_page.html").render(
-        _template_context(document, profile)
+def render_public_page(
+    document: Document, profile: Profile | None, og_image_url: str | None = None
+) -> str:
+    context = _template_context(document, profile)
+    # og-превью для мессенджеров: заголовок, сумма+срок, серверная карточка
+    context["og_title"] = f"Смета № {document.id} — {context['brand_name']}"
+    context["og_description"] = (
+        f"{_money(document.payload['total'])} ₽ · действительна до {context['valid_until']}"
     )
+    context["og_image_url"] = og_image_url
+    return _env.get_template("public/estimate_page.html").render(context)
 
 
 def create_estimate(
@@ -218,6 +234,12 @@ def _contract_context(
 ) -> dict:
     payload = contract.payload
     return {
+        "brand_name": (
+            (profile.brand_name if profile else None)
+            or (profile.full_name if profile else None)
+            or "Исполнитель"
+        ),
+        "logo_data_uri": _logo_data_uri(profile),
         "contract_number": contract.id,
         "contract_date": contract.created_at.strftime("%d.%m.%Y"),
         "act_number": act.id,

@@ -70,7 +70,7 @@ async function verify() {
   <div class="screen">
     <!-- Хиро на весь вход: градиент задаёт тон продукта -->
     <header class="hero login-hero">
-      <div class="login-mark" aria-hidden="true">С</div>
+      <img class="login-mark" src="/icons/mark.svg" alt="" aria-hidden="true" />
       <h1 class="login-title">СметаПро</h1>
       <p class="login-sub">
         смета за минуту <span class="dot">·</span> договор и акт
@@ -117,14 +117,10 @@ async function verify() {
   text-align: center; margin-bottom: var(--s5);
 }
 .login-mark {
-  width: 64px; height: 64px; margin: 0 auto 14px;
+  width: 68px; height: 68px; margin: 0 auto 14px;
+  display: block;
   border-radius: 20px;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 30px; font-weight: 800;
+  box-shadow: var(--shadow-float);
   animation: mark-in 400ms var(--ease) both; /* мягкое всплытие */
 }
 @keyframes mark-in {

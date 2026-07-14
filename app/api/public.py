@@ -6,7 +6,7 @@
 """
 import uuid as uuid_module
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,6 +15,7 @@ from app import storage
 from app.db import get_db
 from app.models import Document, Profile
 from app.services import documents as doc_service
+from app.services import og_card
 
 router = APIRouter(prefix="/e", tags=["public"])
 
@@ -42,7 +43,7 @@ def _get_document(db: Session, public_uuid: str) -> Document:
 
 
 @router.get("/{public_uuid}", response_class=HTMLResponse)
-def public_estimate(public_uuid: str, db: Session = Depends(get_db)):
+def public_estimate(public_uuid: str, request: Request, db: Session = Depends(get_db)):
     try:
         document = _get_document(db, public_uuid)
     except HTTPException as e:
@@ -55,7 +56,18 @@ def public_estimate(public_uuid: str, db: Session = Depends(get_db)):
         db.commit()
 
     profile = db.get(Profile, document.user_id)
-    return HTMLResponse(doc_service.render_public_page(document, profile))
+    og_image_url = str(request.url_for("public_og_image", public_uuid=public_uuid))
+    return HTMLResponse(doc_service.render_public_page(document, profile, og_image_url))
+
+
+@router.get("/{public_uuid}/og.png", name="public_og_image")
+def public_og_image(public_uuid: str, db: Session = Depends(get_db)):
+    """Картинка-превью для мессенджеров (og:image), кэш в хранилище."""
+    document = _get_document(db, public_uuid)
+    profile = db.get(Profile, document.user_id)
+    png = og_card.get_or_render(document, profile)
+    return Response(content=png, media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.post("/{public_uuid}/approve")

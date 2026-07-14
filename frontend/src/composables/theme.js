@@ -18,7 +18,7 @@ export async function loadThemeFromProfile() {
     applyTheme(profile.theme || 'system')
     return profile
   } catch {
-    applyTheme('system')
+    applyTheme('dark') // дефолт продукта — тёмная
     return null
   }
 }

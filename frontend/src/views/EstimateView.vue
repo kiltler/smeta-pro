@@ -8,10 +8,11 @@ import {
 } from 'lucide-vue-next'
 import { api } from '../api.js'
 import BottomSheet from '../components/BottomSheet.vue'
+import Illustration from '../components/Illustration.vue'
 import Money from '../components/Money.vue'
 import RollingNumber from '../components/RollingNumber.vue'
 import SkeletonList from '../components/SkeletonList.vue'
-import { flyToCart, haptic, money, toast } from '../composables/ui.js'
+import { flyToCart, haptic, money, reducedMotion, toast } from '../composables/ui.js'
 
 // ---------- данные ----------
 const router = useRouter()
@@ -156,44 +157,87 @@ function positionsLabel(n) {
   return `${n} позиций`
 }
 
-// мини-диалог «сколько метров?» для ask_qty-позиций комплекта
-const askDialog = ref(null) // {bundle, parts: [{part, item, qty}]}
+// шторка деталей комплекта: тап раскрывает состав, количество правится тут же
+const bundleSheet = ref(null) // {bundle, parts: [{part, item, qty}]}
 
 function tapBundle(bundle, event) {
   usage.value[bundle.id] = (usage.value[bundle.id] || 0) + 1
   localStorage.setItem(USAGE_KEY, JSON.stringify(usage.value))
-
-  const askParts = bundle.items.filter((p) => p.ask_qty)
-  if (askParts.length === 0) return applyBundle(bundle, {}, event)
-  askDialog.value = {
+  bundleSheet.value = {
     bundle,
-    parts: askParts.map((part) => ({
+    parts: bundle.items.map((part) => ({
       part,
       item: itemById.value[part.price_item_id],
       qty: part.qty_default,
     })),
   }
+  flipFromCard(event?.currentTarget)
 }
 
-function applyBundle(bundle, askedQty, event) {
-  for (const part of bundle.items) {
-    const item = itemById.value[part.price_item_id]
-    if (!item) continue
+const bundleSheetTotal = computed(() => {
+  if (!bundleSheet.value) return 0
+  return bundleSheet.value.parts.reduce(
+    (sum, e) => sum + Number(e.item?.price || 0) * (Number(e.qty) || 0), 0
+  )
+})
+
+function confirmBundleSheet(event) {
+  const s = bundleSheet.value
+  for (const e of s.parts) {
+    if (!e.item) continue
     addToCart(
-      { price_item_id: item.id, name: item.name, unit: item.unit, price: item.price },
-      askedQty[part.price_item_id] ?? part.qty_default
+      { price_item_id: e.item.id, name: e.item.name, unit: e.item.unit, price: e.item.price },
+      Number(e.qty) || 0
     )
   }
   haptic()
-  flyToCart(event?.currentTarget, `+ ${bundle.name}`)
-  askDialog.value = null
+  flyToCart(event?.currentTarget, `+ ${s.bundle.name}`)
+  bundleSheet.value = null
 }
 
-function confirmAskDialog() {
-  const asked = Object.fromEntries(
-    askDialog.value.parts.map(({ part, qty }) => [part.price_item_id, Number(qty) || 0])
-  )
-  applyBundle(askDialog.value.bundle, asked)
+// shared-element: заголовок и цена перелетают из карточки в шторку (250ms spring)
+function flipFromCard(cardEl) {
+  if (!cardEl || reducedMotion()) return
+  const src = {
+    name: cardEl.querySelector('.b-name'),
+    price: cardEl.querySelector('.b-price'),
+  }
+  // два rAF: ждём, пока шторка попала в DOM и начала выезжать
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    for (const key of ['name', 'price']) {
+      const fromEl = src[key]
+      const toEl = document.getElementById(`bd-${key}`)
+      if (!fromEl || !toEl) continue
+      const from = fromEl.getBoundingClientRect()
+      const to = toEl.getBoundingClientRect()
+      // шторка ещё едет снизу: вычитаем её текущий translateY из цели
+      const sheet = toEl.closest('.sheet')
+      const shift = sheet
+        ? new DOMMatrixReadOnly(getComputedStyle(sheet).transform).m42
+        : 0
+      const clone = fromEl.cloneNode(true)
+      Object.assign(clone.style, {
+        position: 'fixed',
+        left: `${from.left}px`,
+        top: `${from.top}px`,
+        width: `${from.width}px`,
+        margin: '0',
+        zIndex: 95,
+        pointerEvents: 'none',
+        transition: 'transform 250ms cubic-bezier(0.3, 1.3, 0.4, 1)',
+      })
+      toEl.style.opacity = '0'
+      document.body.appendChild(clone)
+      requestAnimationFrame(() => {
+        clone.style.transform =
+          `translate(${to.left - from.left}px, ${to.top - shift - from.top}px)`
+      })
+      setTimeout(() => {
+        clone.remove()
+        toEl.style.opacity = ''
+      }, 270)
+    }
+  }))
 }
 
 // ---------- оформление сметы (корзина → PDF-документ) ----------
@@ -439,9 +483,10 @@ async function confirmReview() {
                 <button type="button" :aria-label="`Добавить ${item.name}`" @click="addPriceItem(item, 1, $event)">+</button>
               </div>
             </div>
-            <p v-if="!filteredItems.length && !filteredBundles.length" class="muted" style="text-align:center; padding: 12px 0">
-              По запросу «{{ search }}» ничего нет
-            </p>
+            <div v-if="!filteredItems.length && !filteredBundles.length" class="empty" style="padding: var(--s4)">
+              <Illustration name="search" />
+              <p class="muted" style="margin: 0">По запросу «{{ search }}» ничего нет</p>
+            </div>
           </div>
         </template>
       </template>
@@ -519,14 +564,33 @@ async function confirmReview() {
       </button>
     </BottomSheet>
 
-    <!-- Шторка: «сколько метров?» -->
-    <BottomSheet :open="Boolean(askDialog)" :title="askDialog?.bundle.name" @close="askDialog = null">
-      <template v-if="askDialog">
-        <div v-for="entry in askDialog.parts" :key="entry.part.price_item_id">
-          <label>{{ entry.item?.name }} — сколько {{ entry.item?.unit }}?</label>
-          <input v-model="entry.qty" inputmode="decimal" />
+    <!-- Шторка: детали комплекта (карточка раскрывается сюда) -->
+    <BottomSheet :open="Boolean(bundleSheet)" @close="bundleSheet = null">
+      <template #head>
+        <h2 id="bd-name" style="margin: 0">{{ bundleSheet?.bundle.name }}</h2>
+      </template>
+      <template v-if="bundleSheet">
+        <div class="dense">
+          <div v-for="e in bundleSheet.parts" :key="e.part.price_item_id" class="list-item">
+            <div class="grow">
+              <div>{{ e.item?.name || '—' }}</div>
+              <div class="muted" style="font-size: 13px">
+                <Money :value="e.item?.price || 0" style="font-weight: 600" /> / {{ e.item?.unit }}
+              </div>
+            </div>
+            <input
+              v-model="e.qty" inputmode="decimal" class="qty-input"
+              :aria-label="`Количество: ${e.item?.name}`"
+            />
+          </div>
         </div>
-        <button class="cta" style="margin-top: 16px" @click="confirmAskDialog">Добавить</button>
+        <div class="row" style="margin: 14px 0 4px; align-items: baseline">
+          <span class="muted">Итого</span>
+          <Money id="bd-price" :value="bundleSheetTotal" class="total" style="text-align: right" />
+        </div>
+        <button class="cta" style="margin-top: 10px" @click="confirmBundleSheet($event)">
+          В смету
+        </button>
       </template>
     </BottomSheet>
 

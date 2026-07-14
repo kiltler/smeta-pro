@@ -63,6 +63,13 @@ h2 { font-size: 17px; font-weight: 600; margin: 0 0 var(--s3); }
   from { background-position: 0% 40%; }
   to   { background-position: 100% 60%; }
 }
+.hero { position: relative; }
+.hero::after { /* зерно: едва заметная фактура поверх градиента */
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  pointer-events: none; opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.hero > * { position: relative; z-index: 1; }
 
 /* --- кнопки --- */
 button {
@@ -215,6 +222,12 @@ nav.tabs a.router-link-active { color: var(--accent); }
   animation: skeleton-wave 1.4s infinite linear;
 }
 @keyframes skeleton-wave { from { background-position: 120% 0; } to { background-position: -80% 0; } }
+
+/* микро-пульс суммы при изменении значения */
+.money-pulse { animation: money-pulse 300ms var(--ease); }
+@keyframes money-pulse {
+  0% { transform: scale(1); } 40% { transform: scale(1.04); } 100% { transform: scale(1); }
+}
 
 /* --- «улёт» позиции в корзину --- */
 .fly-chip {

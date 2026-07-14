@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Фирменный знак СметаПро: монограмма «С» с галочкой согласования
+       на фирменном градиенте, скруглённый квадрат -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3565ec"/>
+      <stop offset="0.55" stop-color="#5b54e8"/>
+      <stop offset="1" stop-color="#3d3fae"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#g)"/>
+  <!-- лист документа: угол-подгиб за монограммой -->
+  <path d="M356 96h48a12 12 0 0 1 12 12v48z" fill="rgba(255,255,255,0.28)"/>
+  <!-- монограмма С -->
+  <path d="M 340 351 A 128 128 0 1 1 340 161"
+        fill="none" stroke="#fff" stroke-width="58" stroke-linecap="round"/>
+  <!-- галочка согласования в чаше С -->
+  <path d="M 214 262 L 250 298 L 316 222"
+        fill="none" stroke="#fff" stroke-width="40"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

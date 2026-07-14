@@ -1,12 +1,14 @@
 <script setup>
 // Сумма с «перекатом»: при изменении значения цифры плавно докручиваются
-// до нового числа (~400 мс). При reduced-motion — мгновенно.
+// до нового числа (~400 мс) + микро-пульс масштаба. При reduced-motion — мгновенно.
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { money, reducedMotion } from '../composables/ui.js'
 
 const props = defineProps({ value: { type: Number, default: 0 } })
 const shown = ref(props.value)
+const pulsing = ref(false)
 let raf = null
+let pulseTimer = null
 
 watch(
   () => props.value,
@@ -16,6 +18,12 @@ watch(
       shown.value = to
       return
     }
+    // микро-пульс: 1 → 1.04 → 1
+    pulsing.value = false
+    requestAnimationFrame(() => (pulsing.value = true))
+    clearTimeout(pulseTimer)
+    pulseTimer = setTimeout(() => (pulsing.value = false), 320)
+
     const start = performance.now()
     const dur = 400
     const step = (now) => {
@@ -28,9 +36,14 @@ watch(
     raf = requestAnimationFrame(step)
   }
 )
-onBeforeUnmount(() => cancelAnimationFrame(raf))
+onBeforeUnmount(() => {
+  cancelAnimationFrame(raf)
+  clearTimeout(pulseTimer)
+})
 </script>
 
 <template>
-  <span class="total">{{ money(Math.round(shown)) }}</span>
+  <span class="total" :class="{ 'money-pulse': pulsing }" style="display: inline-block">
+    {{ money(Math.round(shown)) }}
+  </span>
 </template>

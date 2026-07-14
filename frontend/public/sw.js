@@ -1,7 +1,8 @@
 // Офлайн-заглушка: кэшируем оболочку приложения, при обрыве сети
-// отдаём её из кэша. Запросы к API не кэшируем никогда.
-const CACHE = 'smeta-pro-v1'
-const SHELL = ['/', '/manifest.webmanifest', '/icon.svg']
+// отдаём её из кэша; для навигации без кэша — офлайн-страница.
+// Запросы к API не кэшируем никогда.
+const CACHE = 'smeta-pro-v2'
+const SHELL = ['/', '/manifest.webmanifest', '/icons/mark.svg', '/offline.html']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)))
@@ -26,8 +27,12 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE).then((cache) => cache.put(event.request, copy))
         return resp
       })
-      .catch(() =>
-        caches.match(event.request).then((cached) => cached || caches.match('/'))
-      )
+      .catch(async () => {
+        const cached = await caches.match(event.request)
+        if (cached) return cached
+        // навигация без кэша → «Нет сети — смета подождёт»
+        if (event.request.mode === 'navigate') return caches.match('/offline.html')
+        return caches.match('/')
+      })
   )
 })

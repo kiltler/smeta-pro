@@ -4,6 +4,7 @@ import { Pencil, Plus, Search, Tags, RefreshCw } from 'lucide-vue-next'
 import { api } from '../api.js'
 import BottomSheet from '../components/BottomSheet.vue'
 import EmptyState from '../components/EmptyState.vue'
+import Illustration from '../components/Illustration.vue'
 import SkeletonList from '../components/SkeletonList.vue'
 import Money from '../components/Money.vue'
 import { usePullRefresh } from '../composables/pullRefresh.js'
@@ -101,9 +102,10 @@ async function removeItem() {
     </EmptyState>
   
     <div v-else class="card dense">
-      <p v-if="filtered.length === 0" class="muted" style="text-align: center; padding: 10px 0">
-        По запросу «{{ search }}» ничего нет
-      </p>
+      <div v-if="filtered.length === 0" class="empty" style="padding: var(--s4)">
+        <Illustration name="search" />
+        <p class="muted" style="margin: 0">По запросу «{{ search }}» ничего нет</p>
+      </div>
       <button
         v-for="item in filtered" :key="item.id"
         class="list-item row-btn" @click="openEdit(item)"

@@ -3,11 +3,12 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Link2, Copy, Check, FileDown, FileSignature,
-  RefreshCw, Files, MoreHorizontal, UserRoundPlus,
+  RefreshCw, MoreHorizontal, UserRoundPlus,
 } from 'lucide-vue-next'
 import { api, getToken } from '../api.js'
 import BottomSheet from '../components/BottomSheet.vue'
 import EmptyState from '../components/EmptyState.vue'
+import Illustration from '../components/Illustration.vue'
 import SkeletonList from '../components/SkeletonList.vue'
 import Money from '../components/Money.vue'
 import { usePullRefresh } from '../composables/pullRefresh.js'
@@ -215,7 +216,7 @@ async function markPaid(d) {
       action="Создать первую"
       @action="router.push('/new')"
     >
-      <template #icon><Files :size="40" :stroke-width="1.5" /></template>
+      <template #icon><Illustration name="docs" /></template>
     </EmptyState>
 
     <div v-else class="stagger">

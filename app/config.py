@@ -16,12 +16,24 @@ class Settings(BaseSettings):
     s3_bucket: str = "smeta"
     s3_secure: bool = False
 
-    # ИИ-парсер (Anthropic API)
-    # Флаг выключен по умолчанию: без кредитов на аккаунте Anthropic
-    # режимы «Голос»/«Текст» скрыты, работает режим «Шаблоны»
-    parse_enabled: bool = False
+    # ИИ-парсер: false — выключен (только «Шаблоны»), mock — детерминированный
+    # разбор по синонимам прайса без LLM (локальное тестирование),
+    # true — реальный Anthropic API (нужны ключ и кредиты)
+    parse_enabled: str = "false"
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-5"
+
+    # Мок-биллинг: кнопка оплаты сразу активирует Pro без ЮKassa
+    # (локальное тестирование пейволла/лимитов/водяного знака). НЕ для серверов!
+    mock_billing: bool = False
+
+    # Универсальный код входа для локального стенда (пусто = выключен).
+    # НИКОГДА не задавать на staging/prod!
+    auth_dev_code: str = ""
+
+    # Админка /admin (basic auth). Пусто = админка выключена (404)
+    admin_user: str = ""
+    admin_password: str = ""
 
     # Биллинг (ЮKassa; тестовый магазин = тестовые shop_id/secret)
     yookassa_shop_id: str = ""

@@ -21,6 +21,18 @@ def alembic_config(db_url: str) -> Config:
     return cfg
 
 
+@pytest.fixture(autouse=True)
+def clean_feature_flags(monkeypatch):
+    """Тесты идут в «серверной» конфигурации: локальные удобства
+    (dev-код входа, мок-биллинг, мок-парсер) выключены, если тест
+    не включил их явно."""
+    monkeypatch.setattr(settings, "auth_dev_code", "")
+    monkeypatch.setattr(settings, "mock_billing", False)
+    monkeypatch.setattr(settings, "parse_enabled", "false")
+    monkeypatch.setattr(settings, "admin_user", "")
+    monkeypatch.setattr(settings, "admin_password", "")
+
+
 @pytest.fixture(scope="session")
 def pg_admin_engine():
     """Соединение с сервером Postgres для создания/удаления временных БД."""

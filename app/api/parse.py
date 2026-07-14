@@ -27,12 +27,15 @@ class CorrectionIn(BaseModel):
 
 @router.post("")
 def parse(data: ParseIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if not settings.parse_enabled:
+    mode = settings.parse_enabled
+    if mode not in ("mock", "true"):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Распознавание текста временно отключено. Соберите смету из шаблонов.",
         )
     try:
+        if mode == "mock":
+            return parser.parse_text_mock(db, user, data.text)
         return parser.parse_text(db, user, data.text)
     except parser.ParserNotConfigured:
         raise HTTPException(

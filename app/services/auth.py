@@ -78,8 +78,22 @@ def request_code(session: Session, phone: str) -> None:
     send_sms(phone, f"Код входа в СметаПро: {code}")
 
 
+def _get_or_create_user(session: Session, phone: str) -> User:
+    user = session.scalar(select(User).where(User.phone == phone))
+    if user is None:
+        user = User(phone=phone)
+        session.add(user)
+    session.commit()
+    return user
+
+
 def verify_code(session: Session, phone: str, code: str) -> User:
     """Проверяет код; при успехе возвращает пользователя (создавая при первом входе)."""
+    # Локальный стенд: универсальный dev-код (AUTH_DEV_CODE), чтобы входить
+    # с телефона без чтения логов. На серверах переменная не задаётся.
+    if settings.auth_dev_code and hmac.compare_digest(code, settings.auth_dev_code):
+        return _get_or_create_user(session, phone)
+
     auth_code = session.scalar(
         select(AuthCode).where(AuthCode.phone == phone).order_by(AuthCode.id.desc()).limit(1)
     )
@@ -99,12 +113,7 @@ def verify_code(session: Session, phone: str, code: str) -> User:
         raise InvalidCode
 
     auth_code.used_at = now
-    user = session.scalar(select(User).where(User.phone == phone))
-    if user is None:
-        user = User(phone=phone)
-        session.add(user)
-    session.commit()
-    return user
+    return _get_or_create_user(session, phone)
 
 
 def create_access_token(user_id: int) -> str:

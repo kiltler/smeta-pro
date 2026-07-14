@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import storage
 from app.api import (
+    admin,
     auth,
     billing,
     bundles,
@@ -44,6 +45,7 @@ app.include_router(parse.router)
 app.include_router(documents.router)
 app.include_router(public.router)
 app.include_router(billing.router)
+app.include_router(admin.router)
 
 # В staging/prod-образе фронт собран в /code/static и раздаётся приложением
 # (один образ = вся версия). Маунт последним — API-маршруты в приоритете.

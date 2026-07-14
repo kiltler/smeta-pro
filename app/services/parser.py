@@ -126,14 +126,108 @@ def _num(value: float) -> float | int:
     return int(value) if float(value).is_integer() else float(value)
 
 
-def parse_text(session: Session, user: User, text: str) -> dict:
-    """Разбирает диктовку и возвращает позиции с ценами + id записи в parse_logs."""
+# ---------- мок-парсер (PARSE_ENABLED=mock): без LLM, по синонимам прайса ----------
+
+_NUM_WORDS = {
+    "полтора": 1.5, "один": 1, "одна": 1, "два": 2, "две": 2, "три": 3,
+    "четыре": 4, "пять": 5, "шесть": 6, "семь": 7, "восемь": 8,
+    "девять": 9, "десять": 10,
+}
+_QTY_RE = re.compile(
+    r"^\s*[—–-]?\s*(\d+(?:[.,]\d+)?|" + "|".join(_NUM_WORDS) + r")\b", re.I
+)
+_STOP_WORDS = {
+    "и", "еще", "ещё", "плюс", "так", "значит", "метра", "метров", "метр",
+    "штук", "штуки", "шт", "м", "на", "по", "под", "с", "для",
+}
+
+
+def _norm(text: str) -> str:
+    return re.sub("ё", "е", text.casefold())
+
+
+def _parse_qty(tail: str) -> float | None:
+    m = _QTY_RE.match(tail)
+    if not m:
+        return None
+    token = m.group(1).lower()
+    return _NUM_WORDS.get(token) or float(token.replace(",", "."))
+
+
+def mock_match(items: list[PriceItem], bundles: list[Bundle], text: str) -> dict:
+    """Детерминированный разбор: точные вхождения названий/синонимов + число рядом."""
+    normalized = _norm(text)
+    # кандидаты: (нормализованная фраза, тип, каноничное название); длинные — первыми
+    candidates: list[tuple[str, str, str]] = []
+    for bundle in bundles:
+        candidates.append((_norm(bundle.name), "bundle", bundle.name))
+    for item in items:
+        candidates.append((_norm(item.name), "item", item.name))
+        for synonym in item.synonyms or []:
+            candidates.append((_norm(synonym), "item", item.name))
+    candidates.sort(key=lambda c: len(c[0]), reverse=True)
+
+    taken: list[tuple[int, int]] = []  # занятые фрагменты текста
+    found: list[tuple[int, str, str, float]] = []  # (позиция, тип, название, кол-во)
+
+    for phrase, kind, name in candidates:
+        for m in re.finditer(rf"(?<![а-яa-z0-9]){re.escape(phrase)}(?![а-яa-z0-9])", normalized):
+            span = (m.start(), m.end())
+            if any(s < span[1] and span[0] < e for s, e in taken):
+                continue  # кусок уже занят более длинной фразой
+            qty = _parse_qty(normalized[m.end():])
+            taken.append(span)
+            found.append((m.start(), kind, name, qty or 1))
+
+    result = {"items": [], "bundles": [], "unrecognized": []}
+    for _, kind, name, qty in sorted(found):
+        result["items" if kind == "item" else "bundles"].append({"name": name, "qty": qty})
+
+    # остаток текста (не сматченный и не числа/служебные слова) — в unrecognized
+    leftover = list(normalized)
+    for s, e in taken:
+        leftover[s:e] = " " * (e - s)
+    for chunk in re.split(r"[,.;]+", "".join(leftover)):
+        words = [
+            w for w in re.findall(r"[а-яa-z]+", chunk)
+            if w not in _STOP_WORDS and w not in _NUM_WORDS
+        ]
+        if words:
+            result["unrecognized"].append(" ".join(words))
+    return result
+
+
+def _load_user_catalog(session: Session, user: User) -> tuple[list[PriceItem], list[Bundle]]:
     items = session.scalars(select(PriceItem).where(PriceItem.user_id == user.id)).all()
     bundles = session.scalars(select(Bundle).where(Bundle.user_id == user.id)).all()
+    return items, bundles
+
+
+def parse_text_mock(session: Session, user: User, text: str) -> dict:
+    """PARSE_ENABLED=mock: локальное тестирование без LLM."""
+    items, bundles = _load_user_catalog(session, user)
+    raw = mock_match(items, bundles, text.strip())
+    return _finalize(session, user, text, raw, items, bundles)
+
+
+def parse_text(session: Session, user: User, text: str) -> dict:
+    """Разбирает диктовку и возвращает позиции с ценами + id записи в parse_logs."""
+    items, bundles = _load_user_catalog(session, user)
 
     user_message = f"{_build_catalog(items, bundles)}\n\nДиктовка: «{text.strip()}»"
     raw = _call_model(build_system_prompt(), user_message)
+    return _finalize(session, user, text, raw, items, bundles)
 
+
+def _finalize(
+    session: Session,
+    user: User,
+    text: str,
+    raw: dict,
+    items: list[PriceItem],
+    bundles: list[Bundle],
+) -> dict:
+    """Общий хвост live/mock: матчинг к id, раскрытие комплектов, parse_logs."""
     items_by_name = {i.name.casefold(): i for i in items}
     bundles_by_name = {b.name.casefold(): b for b in bundles}
     items_by_id = {i.id: i for i in items}

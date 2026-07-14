@@ -15,7 +15,7 @@ from app.services.hvac_template import PRICE_ITEMS
 def seeded_client(auth_client, monkeypatch):
     from app.config import settings
 
-    monkeypatch.setattr(settings, "parse_enabled", True)
+    monkeypatch.setattr(settings, "parse_enabled", "true")
     auth_client.post("/pricelist/seed")
     return auth_client
 
@@ -23,7 +23,7 @@ def seeded_client(auth_client, monkeypatch):
 def test_parse_disabled_by_flag(auth_client, monkeypatch):
     from app.config import settings
 
-    monkeypatch.setattr(settings, "parse_enabled", False)
+    monkeypatch.setattr(settings, "parse_enabled", "false")
     resp = auth_client.post("/parse", json={"text": "монтаж девятки"})
     assert resp.status_code == 503
     assert "из шаблонов" in resp.json()["detail"]
@@ -32,7 +32,7 @@ def test_parse_disabled_by_flag(auth_client, monkeypatch):
 def test_config_exposes_flag(client, monkeypatch):
     from app.config import settings
 
-    monkeypatch.setattr(settings, "parse_enabled", False)
+    monkeypatch.setattr(settings, "parse_enabled", "false")
     assert client.get("/config").json() == {"parse_enabled": False}
 
 

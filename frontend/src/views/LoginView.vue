@@ -34,7 +34,7 @@ async function verify() {
     setToken(data.access_token)
     // Пустой прайс — значит первый вход: ведём в онбординг
     const items = await api('/pricelist')
-    router.push(items.length === 0 ? '/onboarding' : '/price')
+    router.push(items.length === 0 ? '/onboarding' : '/new')
   } catch (e) {
     error.value = e.message
   } finally {

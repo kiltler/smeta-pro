@@ -38,7 +38,7 @@ def require_credits():
 def seeded_client(auth_client, monkeypatch):
     from app.config import settings
 
-    monkeypatch.setattr(settings, "parse_enabled", True)
+    monkeypatch.setattr(settings, "parse_enabled", "true")
     auth_client.post("/pricelist/seed")
     return auth_client
 

@@ -15,7 +15,8 @@ router = APIRouter()
 @router.get("/config")
 def public_config():
     """Публичные фиче-флаги для фронтенда (без секретов!)."""
-    return {"parse_enabled": settings.parse_enabled}
+    # фронту не важно, mock это или живой LLM — табы «Голос»/«Текст» видны
+    return {"parse_enabled": settings.parse_enabled in ("mock", "true")}
 
 
 @router.get("/health")

@@ -138,6 +138,9 @@ def _maybe_start_renewal(session: Session, sub: Subscription) -> None:
     attempt_key = f"renewal:{sub.user_id}:{sub.period_end.date().isoformat()}"
     if not _claim_event(session, attempt_key):
         return
+    if settings.mock_billing:  # локальный стенд: «автосписание» мгновенно успешно
+        _activate_mock_subscription(session, sub.user_id)
+        return
     try:
         payment = client.charge(sub.user_id, sub.yookassa_payment_method_id)
         session.commit()
@@ -198,8 +201,28 @@ def user_is_pro(session: Session, user: User) -> bool:
 
 # ---------- подписка ----------
 
+def _activate_mock_subscription(session: Session, user_id: int) -> None:
+    """MOCK_BILLING: мгновенная активация Pro без ЮKassa (локальный стенд)."""
+    sub = session.get(Subscription, user_id)
+    if sub is None:
+        sub = Subscription(user_id=user_id)
+        session.add(sub)
+    now = _now()
+    base = sub.period_end if (sub.period_end and sub.period_end > now) else now
+    sub.plan = "pro"
+    sub.status = "active"
+    sub.period_end = base + timedelta(days=PERIOD_DAYS)
+    sub.yookassa_payment_method_id = "mock-payment-method"
+    session.commit()
+    logger.info("MOCK_BILLING: подписка user=%s активна до %s", user_id, sub.period_end)
+
+
 def start_subscription(session: Session, user: User) -> str:
-    """Создаёт платёж ЮKassa, возвращает URL страницы оплаты."""
+    """Создаёт платёж ЮKassa, возвращает URL страницы оплаты.
+    При MOCK_BILLING подписка активируется сразу, «оплата» мгновенна."""
+    if settings.mock_billing:
+        _activate_mock_subscription(session, user.id)
+        return settings.billing_return_url
     payment = client.create_payment(user.id)
     logger.info("Создан платёж подписки: user=%s payment=%s", user.id, payment.get("id"))
     return payment["confirmation"]["confirmation_url"]

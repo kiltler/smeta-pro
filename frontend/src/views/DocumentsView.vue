@@ -1,35 +1,47 @@
 <script setup>
 import { onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  FileText, Link2, Copy, Check, FileDown, FileSignature,
+  Wallet, RefreshCw, Files,
+} from 'lucide-vue-next'
 import { api, getToken } from '../api.js'
+import BottomSheet from '../components/BottomSheet.vue'
+import EmptyState from '../components/EmptyState.vue'
+import SkeletonList from '../components/SkeletonList.vue'
+import { usePullRefresh } from '../composables/pullRefresh.js'
+import { haptic, money, toast } from '../composables/ui.js'
 
 const route = useRoute()
+const router = useRouter()
 const docs = ref([])
-const error = ref('')
+const loading = ref(true)
 const copiedId = ref(null)
+const bumpId = ref(null) // документ, чей статус только что изменился → пружинка бейджа
 const highlightId = Number(route.query.created) || null
 
 const STATUS = {
   draft: { text: 'Черновик', cls: 'st-draft' },
   sent: { text: 'Просмотрена', cls: 'st-sent' },
-  approved: { text: '✓ Согласована', cls: 'st-approved' },
-  paid: { text: '₽ Оплачена', cls: 'st-paid' },
+  approved: { text: 'Согласована', cls: 'st-approved' },
+  paid: { text: 'Оплачена', cls: 'st-paid' },
 }
 const TYPE = { estimate: 'Смета', contract: 'Договор', act: 'Акт' }
 
-const fmt = (n) => Number(n).toLocaleString('ru-RU')
 const fmtDate = (iso) => new Date(iso).toLocaleDateString('ru-RU')
 const publicUrl = (d) => `${location.origin}/e/${d.public_uuid}`
 const isExpired = (d) => d.expires_at && new Date(d.expires_at) < new Date()
 
 async function load() {
   docs.value = await api('/documents')
+  loading.value = false
 }
 onMounted(load)
+const { pulling } = usePullRefresh(load)
 
 async function shareLink(d) {
   const url = publicUrl(d)
-  const title = `Смета № ${d.id} — ${fmt(d.total)} ₽`
+  const title = `Смета № ${d.id} — ${money(d.total)}`
   if (navigator.share) {
     try {
       await navigator.share({ title, url })
@@ -47,19 +59,19 @@ async function openPdf(d) {
     headers: { Authorization: `Bearer ${getToken()}` },
   })
   if (!resp.ok) {
-    error.value = 'Не удалось открыть PDF'
+    toast('Не удалось открыть PDF', 'error')
     return
   }
   window.open(URL.createObjectURL(await resp.blob()), '_blank')
 }
 
 async function duplicate(d) {
-  error.value = ''
   try {
     await api(`/documents/${d.id}/duplicate`, { method: 'POST' })
+    toast('Смета продублирована')
     await load()
   } catch (e) {
-    error.value = e.message
+    toast(e.message, 'error')
   }
 }
 
@@ -86,7 +98,6 @@ const savingContract = ref(false)
 
 async function submitContract() {
   const f = contractForm.value
-  error.value = ''
   savingContract.value = true
   try {
     await api(`/documents/${f.estimateId}/contract-act`, {
@@ -103,9 +114,10 @@ async function submitContract() {
       },
     })
     contractForm.value = null
+    toast('Договор и акт готовы')
     await load()
   } catch (e) {
-    error.value = e.message
+    toast(e.message, 'error')
   } finally {
     savingContract.value = false
   }
@@ -115,121 +127,156 @@ async function submitContract() {
 const taxReminder = ref(false)
 
 async function markPaid(d) {
-  error.value = ''
   try {
     await api(`/documents/${d.id}/mark-paid`, { method: 'POST' })
+    haptic()
     taxReminder.value = true
     await load()
+    bumpId.value = d.id
+    setTimeout(() => (bumpId.value = null), 500)
   } catch (e) {
-    error.value = e.message
+    toast(e.message, 'error')
   }
 }
 </script>
 
 <template>
-  <h1>Документы</h1>
-  <p class="error">{{ error }}</p>
-
-  <!-- Напоминание про чек НПД: штраф за отсутствие чека — 20% суммы -->
-  <div v-if="taxReminder" class="card tax-reminder">
-    <b>💰 Не забудьте чек в «Мой налог»!</b>
-    <p style="margin: 6px 0">
-      Оплата получена — сформируйте чек в приложении «Мой налог» и отправьте
-      заказчику. За отсутствие чека грозит штраф 20% от суммы.
-    </p>
-    <button class="small" @click="taxReminder = false">Чек выбит ✓</button>
-  </div>
-
-  <!-- Форма заказчика для договора и акта -->
-  <div v-if="contractForm" class="card">
-    <h2>Договор + акт к смете № {{ contractForm.estimateId }}</h2>
-    <div class="row" style="margin-bottom: 4px">
-      <button
-        class="small" :class="{ secondary: contractForm.type !== 'person' }"
-        @click="contractForm.type = 'person'"
-      >Физлицо</button>
-      <button
-        class="small" :class="{ secondary: contractForm.type !== 'company' }"
-        @click="contractForm.type = 'company'"
-      >Юрлицо / ИП</button>
-    </div>
-    <label>{{ contractForm.type === 'company' ? 'Название организации' : 'ФИО заказчика' }}</label>
-    <input v-model="contractForm.name" :placeholder="contractForm.type === 'company' ? 'ООО «Тёплый дом»' : 'Смирнова Анна Петровна'" />
-    <template v-if="contractForm.type === 'company'">
-      <label>ИНН организации</label>
-      <input v-model="contractForm.inn" inputmode="numeric" placeholder="2721234567" />
-    </template>
-    <label>Адрес объекта</label>
-    <input v-model="contractForm.address" placeholder="г. Хабаровск, ул. Ленина 5, кв. 12" />
-    <label>Телефон заказчика</label>
-    <input v-model="contractForm.phone" inputmode="tel" placeholder="+7 914 123-45-67" />
-    <label>Срок выполнения работ</label>
-    <input v-model="contractForm.deadline" placeholder="до 25.07.2026" />
-    <div class="row" style="margin-top: 12px">
-      <button
-        :disabled="savingContract || !contractForm.name || !contractForm.address
-                   || !contractForm.phone || !contractForm.deadline"
-        @click="submitContract"
-      >{{ savingContract ? 'Создаю…' : 'Создать договор и акт' }}</button>
-      <button class="secondary" @click="contractForm = null">Отмена</button>
-    </div>
-  </div>
-
-  <p v-if="docs.length === 0" class="muted">
-    Пока нет документов. Соберите смету на экране «Смета».
-  </p>
-
-  <div
-    v-for="d in docs" :key="d.id" class="card"
-    :class="{ fresh: d.id === highlightId }"
-  >
-    <div class="row" style="align-items: baseline">
-      <div class="grow">
-        <b>{{ TYPE[d.type] }} № {{ d.id }}</b>
-        <span class="muted"> от {{ fmtDate(d.created_at) }}</span>
-        <span v-if="d.parent_id" class="muted"> · к смете № {{ d.parent_id }}</span>
+  <div class="screen">
+    <h1>Документы</h1>
+  
+    <div class="ptr" :class="{ active: pulling }" aria-hidden="true"><RefreshCw :size="18" /></div>
+  
+    <SkeletonList v-if="loading" :rows="4" />
+  
+    <EmptyState
+      v-else-if="docs.length === 0"
+      text="Пока нет документов — соберите первую смету"
+      action="К смете"
+      @action="router.push('/new')"
+    >
+      <template #icon><Files :size="40" :stroke-width="1.5" /></template>
+    </EmptyState>
+  
+    <div v-else class="stagger">
+      <div
+        v-for="d in docs" :key="d.id" class="card doc-card"
+        :class="{ fresh: d.id === highlightId }"
+      >
+        <div class="doc-head">
+          <div class="grow">
+            <b>{{ TYPE[d.type] }} № {{ d.id }}</b>
+            <div class="muted">
+              {{ fmtDate(d.created_at) }}<template v-if="d.parent_id"> · к смете № {{ d.parent_id }}</template>
+            </div>
+          </div>
+          <span :class="['status', STATUS[d.status].cls, { bump: d.id === bumpId }]">
+            {{ STATUS[d.status].text }}
+          </span>
+        </div>
+  
+        <div class="doc-meta">
+          <span class="grow muted">
+            {{ d.client_name || 'Без имени заказчика' }}
+            <template v-if="d.type === 'estimate'">
+              · <template v-if="isExpired(d)">срок ссылки истёк</template>
+              <template v-else>ссылка до {{ fmtDate(d.expires_at) }}</template>
+            </template>
+          </span>
+          <span class="total">{{ money(d.total) }}</span>
+        </div>
+  
+        <div v-if="d.type === 'estimate' && d.status === 'paid'" class="paid-note">
+          <Wallet :size="15" aria-hidden="true" /> Оплачена — не забудьте чек в «Мой налог»
+        </div>
+  
+        <div class="doc-actions">
+          <button
+            v-if="d.type === 'estimate'" class="small soft"
+            :disabled="isExpired(d)" @click="shareLink(d)"
+          >
+            <Check v-if="copiedId === d.id" :size="15" />
+            <Link2 v-else :size="15" />
+            {{ copiedId === d.id ? 'Скопирована' : 'Ссылка клиенту' }}
+          </button>
+          <button class="small secondary" @click="openPdf(d)"><FileDown :size="15" /> PDF</button>
+          <template v-if="d.type === 'estimate'">
+            <button v-if="canContract(d)" class="small soft" @click="openContractForm(d)">
+              <FileSignature :size="15" /> Договор + акт
+            </button>
+            <button v-if="d.status === 'approved'" class="small secondary" @click="markPaid(d)">
+              <Wallet :size="15" /> Оплачено
+            </button>
+            <button class="small secondary" @click="duplicate(d)"><Copy :size="15" /> Дублировать</button>
+          </template>
+        </div>
       </div>
-      <span :class="['status', STATUS[d.status].cls]">{{ STATUS[d.status].text }}</span>
     </div>
-    <div class="muted" style="margin: 6px 0 2px">
-      {{ d.client_name || 'Без имени заказчика' }}
-      <template v-if="d.type === 'estimate'">
-        · <template v-if="isExpired(d)">срок истёк</template>
-        <template v-else>до {{ fmtDate(d.expires_at) }}</template>
-      </template>
-    </div>
-    <div class="total" style="margin: 6px 0 10px">{{ fmt(d.total) }} ₽</div>
-
-    <div v-if="d.type === 'estimate' && d.status === 'paid'" class="muted" style="margin-bottom: 8px">
-      💰 Оплачена — не забудьте чек в «Мой налог»
-    </div>
-
-    <div class="row" style="flex-wrap: wrap; gap: 8px">
-      <template v-if="d.type === 'estimate'">
-        <button class="small" :disabled="isExpired(d)" @click="shareLink(d)">
-          {{ copiedId === d.id ? '✓ Скопирована' : 'Ссылка клиенту' }}
-        </button>
-      </template>
-      <button class="small secondary" @click="openPdf(d)">PDF</button>
-      <template v-if="d.type === 'estimate'">
-        <button v-if="canContract(d)" class="small" @click="openContractForm(d)">
-          Договор + акт
-        </button>
+  
+    <!-- Шторка: заказчик для договора и акта -->
+    <BottomSheet
+      :open="Boolean(contractForm)"
+      :title="contractForm ? `Договор + акт к смете № ${contractForm.estimateId}` : ''"
+      @close="contractForm = null"
+    >
+      <template v-if="contractForm">
+        <div class="segment" role="tablist" aria-label="Тип заказчика">
+          <button role="tab" :aria-selected="contractForm.type === 'person'" :class="{ active: contractForm.type === 'person' }" @click="contractForm.type = 'person'">Физлицо</button>
+          <button role="tab" :aria-selected="contractForm.type === 'company'" :class="{ active: contractForm.type === 'company' }" @click="contractForm.type = 'company'">Юрлицо / ИП</button>
+        </div>
+        <label>{{ contractForm.type === 'company' ? 'Название организации' : 'ФИО заказчика' }}</label>
+        <input v-model="contractForm.name" :placeholder="contractForm.type === 'company' ? 'ООО «Тёплый дом»' : 'Смирнова Анна Петровна'" />
+        <template v-if="contractForm.type === 'company'">
+          <label>ИНН организации</label>
+          <input v-model="contractForm.inn" inputmode="numeric" placeholder="2721234567" />
+        </template>
+        <label>Адрес объекта</label>
+        <input v-model="contractForm.address" placeholder="г. Хабаровск, ул. Ленина 5, кв. 12" />
+        <label>Телефон заказчика</label>
+        <input v-model="contractForm.phone" inputmode="tel" placeholder="+7 914 123-45-67" />
+        <label>Срок выполнения работ</label>
+        <input v-model="contractForm.deadline" placeholder="до 25.07.2026" />
         <button
-          v-if="d.status === 'approved'" class="small secondary" @click="markPaid(d)"
-        >Оплачено ₽</button>
-        <button class="small secondary" @click="duplicate(d)">Дублировать</button>
+          class="cta" style="margin-top: 16px"
+          :disabled="savingContract || !contractForm.name || !contractForm.address
+                     || !contractForm.phone || !contractForm.deadline"
+          @click="submitContract"
+        >{{ savingContract ? 'Создаю…' : 'Создать договор и акт' }}</button>
       </template>
-    </div>
+    </BottomSheet>
+  
+    <!-- Шторка: напоминание про чек НПД (штраф за отсутствие чека — 20% суммы) -->
+    <BottomSheet :open="taxReminder" title="Не забудьте чек в «Мой налог»" @close="taxReminder = false">
+      <p class="muted" style="margin: 4px 0 16px">
+        Оплата получена — сформируйте чек в приложении «Мой налог» и отправьте
+        заказчику. За отсутствие чека грозит штраф 20% от суммы.
+      </p>
+      <button class="cta" @click="taxReminder = false">Чек выбит</button>
+    </BottomSheet>
   </div>
 </template>
 
 <style scoped>
-.status { font-size: 14px; font-weight: 600; padding: 4px 10px; border-radius: 10px; }
-.st-draft { background: #eef2f7; color: #6b7a8c; }
-.st-sent { background: #fff4e0; color: #a06b00; }
-.st-approved { background: #e6f4ea; color: #1b7f3b; }
-.st-paid { background: #1b7f3b; color: #fff; }
-.fresh { outline: 2px solid var(--blue); }
-.tax-reminder { background: #fff8e1; outline: 2px solid #f0a500; }
+.doc-head { display: flex; align-items: flex-start; gap: var(--s3); }
+.doc-meta { display: flex; align-items: baseline; gap: var(--s3); margin: var(--s2) 0 var(--s3); }
+.paid-note {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--success);
+  background: var(--success-bg);
+  padding: 8px 12px; border-radius: var(--r-s);
+  margin-bottom: var(--s3);
+}
+.doc-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.doc-actions button { display: inline-flex; align-items: center; gap: 6px; }
+.fresh { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.segment {
+  display: flex; gap: 4px; padding: 4px;
+  background: var(--surface-2); border-radius: var(--r);
+  margin-bottom: var(--s2);
+}
+.segment button {
+  min-height: 40px; font-size: 14px; border-radius: 10px;
+  background: transparent; color: var(--text-2);
+}
+.segment button.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
 </style>

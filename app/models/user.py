@@ -33,3 +33,5 @@ class Profile(Base):
     # Ключи файлов в хранилище (см. app/storage.py)
     logo_key: Mapped[str | None] = mapped_column(String(500))
     signature_key: Mapped[str | None] = mapped_column(String(500))
+    # Тема интерфейса: light | dark | system (решение владельца: в профиле, не в localStorage)
+    theme: Mapped[str] = mapped_column(String(10), server_default="system")

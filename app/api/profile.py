@@ -3,6 +3,7 @@ import logging
 import uuid
 
 import re
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, status
 from minio.error import S3Error
@@ -24,6 +25,10 @@ ALLOWED_LOGO_TYPES = {
     "image/webp": "webp",
     "image/svg+xml": "svg",
 }
+
+
+class ThemeIn(BaseModel):
+    theme: Literal["light", "dark", "system"]
 
 
 class ProfileIn(BaseModel):
@@ -48,6 +53,7 @@ class ProfileIn(BaseModel):
 
 class ProfileOut(ProfileIn):
     has_logo: bool = False
+    theme: str = "system"
 
 
 def _get_or_create(db: Session, user_id: int) -> Profile:
@@ -69,6 +75,7 @@ def get_profile(user: User = Depends(get_current_user), db: Session = Depends(ge
         inn=profile.inn,
         requisites=profile.requisites or {},
         has_logo=profile.logo_key is not None,
+        theme=profile.theme or "system",
     )
 
 
@@ -82,7 +89,22 @@ def update_profile(
     profile.inn = data.inn
     profile.requisites = data.requisites
     db.commit()
-    return ProfileOut(**data.model_dump(), has_logo=profile.logo_key is not None)
+    return ProfileOut(
+        **data.model_dump(),
+        has_logo=profile.logo_key is not None,
+        theme=profile.theme or "system",
+    )
+
+
+@router.put("/theme")
+def set_theme(
+    data: ThemeIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Тема интерфейса хранится в профиле (доступна с любого устройства)."""
+    profile = _get_or_create(db, user.id)
+    profile.theme = data.theme
+    db.commit()
+    return {"theme": data.theme}
 
 
 @router.post("/logo")

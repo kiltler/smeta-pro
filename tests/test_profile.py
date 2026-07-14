@@ -14,6 +14,7 @@ def test_profile_empty_then_update(auth_client):
         "inn": None,
         "requisites": {},
         "has_logo": False,
+        "theme": "system",
     }
 
     data = {
@@ -24,7 +25,7 @@ def test_profile_empty_then_update(auth_client):
     }
     resp = auth_client.put("/profile", json=data)
     assert resp.status_code == 200
-    assert auth_client.get("/profile").json() == {**data, "has_logo": False}
+    assert auth_client.get("/profile").json() == {**data, "has_logo": False, "theme": "system"}
 
 
 def test_inn_validation(auth_client):
@@ -72,3 +73,13 @@ def test_logo_404_when_missing(auth_client):
 
 def test_profile_requires_auth(client):
     assert client.get("/profile").status_code == 401
+
+
+def test_theme_stored_in_profile(auth_client):
+    assert auth_client.get("/profile").json()["theme"] == "system"
+    assert auth_client.put("/profile/theme", json={"theme": "dark"}).status_code == 200
+    assert auth_client.get("/profile").json()["theme"] == "dark"
+    # PUT /profile не сбрасывает тему
+    auth_client.put("/profile", json={"brand_name": "X"})
+    assert auth_client.get("/profile").json()["theme"] == "dark"
+    assert auth_client.put("/profile/theme", json={"theme": "neon"}).status_code == 422

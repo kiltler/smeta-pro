@@ -41,26 +41,49 @@ PAGE = """<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex"><title>СметаПро — админ</title>
 <style>
-body{{font-family:system-ui,sans-serif;background:#f4f6fa;color:#17212b;margin:0;font-size:15px}}
-.wrap{{max-width:860px;margin:0 auto;padding:20px 16px}}
-h1{{font-size:22px}} h2{{font-size:17px;margin:22px 0 8px}}
-.tiles{{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}}
-.tile{{background:#fff;border-radius:12px;padding:14px}}
-.tile b{{display:block;font-size:24px}} .tile span{{color:#6b7a8c;font-size:13px}}
-table{{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden}}
-th,td{{padding:8px 10px;border-bottom:1px solid #eef2f7;text-align:left;font-size:14px}}
-th{{background:#eef3fb;color:#333}}
-.pro{{color:#1b7f3b;font-weight:600}}
-</style></head><body><div class="wrap">
-<h1>СметаПро — метрики</h1>
+:root{{--bg:#f5f5f2;--surface:#fff;--surface-2:#eef0f3;--text:#141a22;--text-2:#6d7684;
+--border:rgba(20,26,34,.08);--accent:#2e5fe8;--success:#189a58;
+--hero-a:#3565ec;--hero-b:#5b54e8;--hero-c:#3d7bea;
+--shadow:0 1px 2px rgba(16,24,40,.05),0 4px 14px rgba(16,24,40,.06)}}
+@media (prefers-color-scheme: dark){{:root{{--bg:#0e1420;--surface:#17202f;--surface-2:#202b3d;
+--text:#eef2f8;--text-2:#94a0b3;--border:rgba(255,255,255,.08);--accent:#5f8bff;--success:#3ecf82;
+--hero-a:#1b2a5e;--hero-b:#34246b;--hero-c:#143a72;--shadow:0 1px 0 rgba(255,255,255,.03) inset}}}}
+*{{box-sizing:border-box}}
+body{{font-family:-apple-system,BlinkMacSystemFont,Roboto,Inter,"Segoe UI",system-ui,sans-serif;
+background:var(--bg);color:var(--text);margin:0;font-size:15px;line-height:1.45}}
+.hero{{background:linear-gradient(115deg,var(--hero-a),var(--hero-b) 45%,var(--hero-c) 85%,var(--hero-a));
+background-size:300% 300%;animation:drift 26s ease-in-out infinite alternate;
+color:#fff;padding:26px 16px 30px;border-radius:0 0 22px 22px}}
+@keyframes drift{{from{{background-position:0% 40%}}to{{background-position:100% 60%}}}}
+.hero h1{{max-width:860px;margin:0 auto;font-size:22px;letter-spacing:-.01em}}
+.wrap{{max-width:860px;margin:0 auto;padding:20px 16px 40px}}
+h2{{font-size:17px;margin:26px 0 10px}}
+.tiles{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}}
+.tile{{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+padding:16px;box-shadow:var(--shadow)}}
+.tile b{{display:block;font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;
+letter-spacing:-.01em;line-height:1.2}}
+.tile span{{color:var(--text-2);font-size:13px}}
+.trend{{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:600;color:var(--success)}}
+table{{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);
+border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}}
+th,td{{padding:10px 12px;text-align:left;font-size:14px}}
+th{{background:var(--surface-2);color:var(--text-2);font-size:12.5px;
+text-transform:uppercase;letter-spacing:.04em}}
+tr:nth-child(even) td{{background:var(--surface-2)}}
+td{{font-variant-numeric:tabular-nums}}
+.pro{{color:var(--success);font-weight:700}} .free{{color:var(--text-2)}}
+@media (prefers-reduced-motion: reduce){{*{{animation:none!important}}}}
+</style></head><body>
+<header class="hero"><h1>СметаПро — метрики</h1></header>
+<div class="wrap">
 <div class="tiles">
-  <div class="tile"><b>{users_total}</b><span>пользователей всего</span></div>
-  <div class="tile"><b>{users_7d}</b><span>регистраций за 7 дней</span></div>
-  <div class="tile"><b>{users_30d}</b><span>за 30 дней</span></div>
-  <div class="tile"><b>{docs_total}</b><span>документов всего</span></div>
-  <div class="tile"><b>{docs_30d}</b><span>документов за 30 дней</span></div>
-  <div class="tile"><b>{pro_users}</b><span>Pro-подписок</span></div>
-  <div class="tile"><b>{conversion}%</b><span>конверсия Free→Pro</span></div>
+  <div class="tile"><b>{users_total}</b><span>пользователей всего</span>
+    <div class="trend">↗ +{users_7d} за 7 дней · +{users_30d} за 30</div></div>
+  <div class="tile"><b>{docs_total}</b><span>документов всего</span>
+    <div class="trend">↗ +{docs_30d} за 30 дней</div></div>
+  <div class="tile"><b>{pro_users}</b><span>Pro-подписок</span>
+    <div class="trend">конверсия Free→Pro: {conversion}%</div></div>
   <div class="tile"><b>{estimates} / {contracts} / {acts}</b><span>смет / договоров / актов</span></div>
 </div>
 <h2>Последние пользователи</h2>
